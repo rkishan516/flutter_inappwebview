@@ -28,7 +28,10 @@
 #include "../web_notification/web_notification_controller.h"
 #include "../print_job/print_job_settings.h"
 
+#pragma warning(push)
+#pragma warning(disable:4458)
 #include <WebView2EnvironmentOptions.h>
+#pragma warning(pop)
 
 namespace flutter_inappwebview_plugin
 {
