@@ -96,6 +96,7 @@ namespace flutter_inappwebview_plugin
     const std::variant<std::string, int64_t> id;
     const std::shared_ptr<InAppWebViewSettings> initialSettings;
     const std::optional<std::vector<std::shared_ptr<UserScript>>> initialUserScripts;
+    const flutter::EncodableMap contextMenu = {};
   };
 
   class InAppWebView
@@ -273,6 +274,13 @@ namespace flutter_inappwebview_plugin
     std::map<std::string, std::unique_ptr<WebMessageListener>> webMessageListeners_;
     std::map<std::string, std::shared_ptr<WebNotificationController>> webNotificationControllers_;
     std::map<std::string, std::shared_ptr<PrintJobController>> printJobControllers_;
+
+    struct ContextMenuItemInfo {
+      int64_t id;
+      std::string title;
+    };
+    std::vector<ContextMenuItemInfo> contextMenuItems_;
+    bool hideDefaultSystemContextMenuItems_ = false;
 
     void registerEventHandlers();
     void registerSurfaceEventHandlers();

@@ -63,15 +63,20 @@ namespace flutter_inappwebview_plugin
     auto initialUserScriptList = get_optional_fl_map_value<flutter::EncodableList>(params, "initialUserScripts");
     auto webViewEnvironmentId = get_optional_fl_map_value<std::string>(params, "webViewEnvironmentId");
 
-    RECT bounds;
-    GetClientRect(plugin->registrar->GetView()->GetNativeWindow(), &bounds);
+    RECT bounds = { 0, 0, 0, 0 };
+    HWND parentWindow = HWND_MESSAGE;
+    auto flutterView = plugin->registrar->GetView();
+    if (flutterView) {
+      parentWindow = flutterView->GetNativeWindow();
+      GetClientRect(parentWindow, &bounds);
+    }
 
     auto initialWidth = initialSize->width >= 0 ? initialSize->width : bounds.right - bounds.left;
     auto initialHeight = initialSize->height >= 0 ? initialSize->height : bounds.bottom - bounds.top;
 
     auto hwnd = CreateWindowEx(0, windowClass_.lpszClassName, L"", 0, 0,
       0, (int)initialWidth, (int)initialHeight,
-      plugin->registrar->GetView()->GetNativeWindow(),
+      parentWindow,
       nullptr,
       windowClass_.hInstance, nullptr);
 

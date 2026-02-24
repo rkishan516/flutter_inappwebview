@@ -26,9 +26,13 @@ namespace flutter_inappwebview_plugin
 
     RegisterClass(&wndClass);
 
-    auto parentWindow = plugin->registrar->GetView()->GetNativeWindow();
-    RECT bounds;
-    GetWindowRect(parentWindow, &bounds);
+    HWND parentWindow = nullptr;
+    RECT bounds = { 0, 0, CW_USEDEFAULT, CW_USEDEFAULT };
+    auto flutterView = plugin->registrar->GetView();
+    if (flutterView) {
+      parentWindow = flutterView->GetNativeWindow();
+      GetWindowRect(parentWindow, &bounds);
+    }
 
     auto x = CW_USEDEFAULT;
     auto y = CW_USEDEFAULT;

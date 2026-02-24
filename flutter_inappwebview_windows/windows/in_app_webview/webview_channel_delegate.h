@@ -183,6 +183,9 @@ namespace flutter_inappwebview_plugin
     void onSaveAsUIShowing(std::shared_ptr<SaveAsUIShowingRequest> request, std::unique_ptr<SaveAsUIShowingCallback> callback) const;
     void onSaveFileSecurityCheckStarting(std::shared_ptr<SaveFileSecurityCheckStartingRequest> request, std::unique_ptr<SaveFileSecurityCheckStartingCallback> callback) const;
     void onScreenCaptureStarting(std::shared_ptr<ScreenCaptureStartingRequest> request, std::unique_ptr<ScreenCaptureStartingCallback> callback) const;
+    void onCreateContextMenu(const std::optional<std::string>& extra, const int64_t& type) const;
+    void onHideContextMenu() const;
+    void onContextMenuActionItemClicked(const int64_t& id, const std::string& title) const;
   };
 }
 

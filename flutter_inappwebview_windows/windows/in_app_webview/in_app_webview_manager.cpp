@@ -136,8 +136,13 @@ namespace flutter_inappwebview_plugin
     std::shared_ptr<flutter::FlutterView> flutterView = viewId.has_value()
       ? plugin->registrar->GetViewById(viewId.value())
       : std::shared_ptr<flutter::FlutterView>(plugin->registrar->GetView(), [](flutter::FlutterView*){});
-    RECT bounds;
-    GetClientRect(flutterView->GetNativeWindow(), &bounds);
+
+    HWND parentWindow = HWND_MESSAGE;
+    RECT bounds = { 0, 0, 0, 0 };
+    if (flutterView) {
+      parentWindow = flutterView->GetNativeWindow();
+      GetClientRect(parentWindow, &bounds);
+    }
 
     // Create as WS_CHILD with WS_DISABLED to prevent focus changes
     // This keeps focus on Flutter window (no app lifecycle changes)
@@ -145,7 +150,7 @@ namespace flutter_inappwebview_plugin
     // Keyboard input is forwarded via JavaScript injection
     auto hwnd = CreateWindowEx(0, windowClass_.lpszClassName, L"", WS_CHILD | WS_DISABLED, 0,
       0, bounds.right - bounds.left, bounds.bottom - bounds.top,
-      flutterView->GetNativeWindow(),
+      parentWindow,
       nullptr,
       windowClass_.hInstance, nullptr);
 
@@ -167,6 +172,7 @@ namespace flutter_inappwebview_plugin
       ? plugin->webViewEnvironmentManager->webViewEnvironments.at(webViewEnvironmentId.value()).get() : nullptr;
 
     auto initialSettings = std::make_shared<InAppWebViewSettings>(settingsMap);
+    auto contextMenuMap = get_fl_map_value<flutter::EncodableMap>(*arguments, "contextMenu", flutter::EncodableMap{});
 
     InAppWebView::createInAppWebViewEnv(hwnd, true, webViewEnvironment, initialSettings,
       [=](wil::com_ptr<ICoreWebView2Environment> webViewEnv,
@@ -181,7 +187,8 @@ namespace flutter_inappwebview_plugin
           InAppWebViewCreationParams params = {
             "",
             std::move(initialSettings),
-            initialUserScripts
+            initialUserScripts,
+            contextMenuMap
           };
 
           auto inAppWebView = std::make_unique<InAppWebView>(plugin, params, hwnd, std::move(webViewEnv), std::move(webViewController), std::move(webViewCompositionController));
