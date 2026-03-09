@@ -19,6 +19,7 @@ namespace flutter_inappwebview_plugin
     std::string userAgent;
     bool javaScriptEnabled = true;
     bool transparentBackground = false;
+    std::optional<std::string> underPageBackgroundColor = std::optional<std::string>{};
     bool supportZoom = true;
     bool isInspectable = true;
     bool disableContextMenu = false;

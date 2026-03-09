@@ -20,6 +20,9 @@ namespace flutter_inappwebview_plugin
     userAgent = get_fl_map_value(encodableMap, "userAgent", userAgent);
     javaScriptEnabled = get_fl_map_value(encodableMap, "javaScriptEnabled", javaScriptEnabled);
     transparentBackground = get_fl_map_value(encodableMap, "transparentBackground", transparentBackground);
+    if (fl_map_contains(encodableMap, "underPageBackgroundColor")) {
+      underPageBackgroundColor = get_optional_fl_map_value<std::string>(encodableMap, "underPageBackgroundColor");
+    }
     supportZoom = get_fl_map_value(encodableMap, "supportZoom", supportZoom);
     isInspectable = get_fl_map_value(encodableMap, "isInspectable", isInspectable);
     disableContextMenu = get_fl_map_value(encodableMap, "disableContextMenu", disableContextMenu);
@@ -63,6 +66,7 @@ namespace flutter_inappwebview_plugin
       {"userAgent", userAgent},
       {"javaScriptEnabled", javaScriptEnabled},
       {"transparentBackground", transparentBackground},
+      {"underPageBackgroundColor", make_fl_value(underPageBackgroundColor)},
       {"supportZoom", supportZoom},
       {"isInspectable", isInspectable},
       {"disableContextMenu", disableContextMenu},

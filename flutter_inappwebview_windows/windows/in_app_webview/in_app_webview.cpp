@@ -54,6 +54,49 @@
 namespace flutter_inappwebview_plugin
 {
   using namespace Microsoft::WRL;
+  namespace
+  {
+    std::optional<COREWEBVIEW2_COLOR> parseWebView2Color(const std::optional<std::string>& colorValue)
+    {
+      if (!colorValue.has_value()) {
+        return std::nullopt;
+      }
+
+      auto normalized = colorValue.value();
+      if (!normalized.empty() && normalized[0] == '#') {
+        normalized.erase(0, 1);
+      }
+      if (normalized.length() != 8) {
+        return std::nullopt;
+      }
+
+      try {
+        return COREWEBVIEW2_COLOR{
+          static_cast<BYTE>(std::stoul(normalized.substr(0, 2), nullptr, 16)),
+          static_cast<BYTE>(std::stoul(normalized.substr(2, 2), nullptr, 16)),
+          static_cast<BYTE>(std::stoul(normalized.substr(4, 2), nullptr, 16)),
+          static_cast<BYTE>(std::stoul(normalized.substr(6, 2), nullptr, 16))
+        };
+      }
+      catch (...) {
+        return std::nullopt;
+      }
+    }
+
+    COREWEBVIEW2_COLOR getDefaultBackgroundColor(const InAppWebViewSettings& settings)
+    {
+      if (settings.transparentBackground) {
+        return { 0, 255, 255, 255 };
+      }
+
+      auto color = parseWebView2Color(settings.underPageBackgroundColor);
+      if (color.has_value()) {
+        return color.value();
+      }
+
+      return { 255, 255, 255, 255 };
+    }
+  }
 
   InAppWebView::InAppWebView(const FlutterInappwebviewWindowsPlugin* plugin, const InAppWebViewCreationParams& params, const HWND parentWindow, wil::com_ptr<ICoreWebView2Environment> webViewEnv,
     wil::com_ptr<ICoreWebView2Controller> webViewController,
@@ -273,9 +316,8 @@ namespace flutter_inappwebview_plugin
     }
 
     if (auto webViewController2 = webViewController.try_query<ICoreWebView2Controller2>()) {
-      if (settings->transparentBackground) {
-        webViewController2->put_DefaultBackgroundColor({ 0, 255, 255, 255 });
-      }
+      webViewController2->put_DefaultBackgroundColor(
+        getDefaultBackgroundColor(*settings));
     }
 
     // required to make Runtime events work
@@ -3215,9 +3257,14 @@ namespace flutter_inappwebview_plugin
     }
 
     if (auto webViewController2 = webViewController.try_query<ICoreWebView2Controller2>()) {
-      if (fl_map_contains_not_null(newSettingsMap, "transparentBackground") && settings->transparentBackground != newSettings->transparentBackground) {
-        BYTE alpha = newSettings->transparentBackground ? 0 : 255;
-        webViewController2->put_DefaultBackgroundColor({ alpha, 255, 255, 255 });
+      const bool backgroundColorChanged =
+        (fl_map_contains(newSettingsMap, "transparentBackground") &&
+          settings->transparentBackground != newSettings->transparentBackground) ||
+        (fl_map_contains(newSettingsMap, "underPageBackgroundColor") &&
+          settings->underPageBackgroundColor != newSettings->underPageBackgroundColor);
+      if (backgroundColorChanged) {
+        webViewController2->put_DefaultBackgroundColor(
+          getDefaultBackgroundColor(*newSettings));
       }
     }
 
