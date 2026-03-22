@@ -3835,37 +3835,26 @@ namespace flutter_inappwebview_plugin
 
   void InAppWebView::setPosition(size_t x, size_t y, float scale_factor)
   {
-    if (!webViewController || !plugin || !plugin->registrar) {
+    if (!webViewController) {
       return;
     }
 
-    if (x >= 0 && y >= 0) {
-      scaleFactor_ = scale_factor;
-      auto scaled_x = static_cast<int>(x * scale_factor);
-      auto scaled_y = static_cast<int>(y * scale_factor);
+    scaleFactor_ = scale_factor;
+    auto scaled_x = static_cast<int>(x * scale_factor);
+    auto scaled_y = static_cast<int>(y * scale_factor);
 
-      auto titleBarHeight = ((GetSystemMetrics(SM_CYCAPTION) + GetSystemMetrics(SM_CYFRAME)) * scale_factor) + GetSystemMetrics(SM_CXPADDEDBORDER);
-      auto borderWidth = (GetSystemMetrics(SM_CXBORDER) + GetSystemMetrics(SM_CXPADDEDBORDER)) * scale_factor;
-
-      RECT flutterWindowRect;
-      HWND flutterWindowHWnd = nullptr;
-      if (succeededOrLog(webViewController->get_ParentWindow(&flutterWindowHWnd)) && flutterWindowHWnd != nullptr) {
-        flutterWindowHWnd = GetAncestor(flutterWindowHWnd, GA_ROOT);
-      } else {
-        auto flutterView = plugin->registrar->GetView();
-        flutterWindowHWnd = flutterView ? flutterView->GetNativeWindow() : nullptr;
-      }
-      GetWindowRect(flutterWindowHWnd, &flutterWindowRect);
-
-      HWND webViewHWnd;
-      if (succeededOrLog(webViewController->get_ParentWindow(&webViewHWnd))) {
-        ::SetWindowPos(webViewHWnd,
-          nullptr,
-          static_cast<int>(flutterWindowRect.left + scaled_x - borderWidth),
-          static_cast<int>(flutterWindowRect.top + scaled_y - titleBarHeight),
-          0, 0,
-          SWP_NOZORDER | SWP_NOSIZE | SWP_NOACTIVATE);
-      }
+    // The WebView's parent HWND is a WS_CHILD of the Flutter window,
+    // so SetWindowPos coordinates are relative to the Flutter window's
+    // client area. (x, y) from Dart's localToGlobal(Offset.zero) is
+    // already in client-area logical pixels, so just scale to physical.
+    HWND webViewHWnd;
+    if (succeededOrLog(webViewController->get_ParentWindow(&webViewHWnd))) {
+      ::SetWindowPos(webViewHWnd,
+        nullptr,
+        scaled_x,
+        scaled_y,
+        0, 0,
+        SWP_NOZORDER | SWP_NOSIZE | SWP_NOACTIVATE);
     }
   }
 
