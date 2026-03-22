@@ -1,3 +1,4 @@
+#include <cmath>
 #include <cstring>
 #include <filesystem>
 #include <nlohmann/json.hpp>
@@ -159,7 +160,7 @@ namespace flutter_inappwebview_plugin
         if (willBeSurface && (webViewEnv10 || webViewEnv3)) {
           if (webViewEnv10 && options) {
             failedLog(webViewEnv10->CreateCoreWebView2CompositionControllerWithOptions(parentWindow, options.get(), Callback<ICoreWebView2CreateCoreWebView2CompositionControllerCompletedHandler>(
-              [completionHandler, env](HRESULT result, wil::com_ptr<ICoreWebView2CompositionController> compositionController) -> HRESULT
+              [completionHandler, env, parentWindow](HRESULT result, wil::com_ptr<ICoreWebView2CompositionController> compositionController) -> HRESULT
               {
                 wil::com_ptr<ICoreWebView2Controller3> webViewController = compositionController.try_query<ICoreWebView2Controller3>();
 
@@ -172,7 +173,10 @@ namespace flutter_inappwebview_plugin
                 if (succeededOrLog(webViewController->QueryInterface(IID_PPV_ARGS(&webViewController3)))) {
                   webViewController3->put_BoundsMode(COREWEBVIEW2_BOUNDS_MODE_USE_RAW_PIXELS);
                   webViewController3->put_ShouldDetectMonitorScaleChanges(FALSE);
-                  webViewController3->put_RasterizationScale(1.0);
+                  // Use the actual system DPI for the initial rasterization
+                  // scale so that content loaded before the first
+                  // setSurfaceSize call from Dart renders at the correct DPI.
+                  webViewController3->put_RasterizationScale(get_current_scale_factor(parentWindow));
                 }
 
                 completionHandler(std::move(env), std::move(webViewController), std::move(compositionController));
@@ -182,7 +186,7 @@ namespace flutter_inappwebview_plugin
           }
           else {
             failedLog(webViewEnv3->CreateCoreWebView2CompositionController(parentWindow, Callback<ICoreWebView2CreateCoreWebView2CompositionControllerCompletedHandler>(
-              [completionHandler, env](HRESULT result, wil::com_ptr<ICoreWebView2CompositionController> compositionController) -> HRESULT
+              [completionHandler, env, parentWindow](HRESULT result, wil::com_ptr<ICoreWebView2CompositionController> compositionController) -> HRESULT
               {
                 wil::com_ptr<ICoreWebView2Controller3> webViewController = compositionController.try_query<ICoreWebView2Controller3>();
 
@@ -195,7 +199,7 @@ namespace flutter_inappwebview_plugin
                 if (succeededOrLog(webViewController->QueryInterface(IID_PPV_ARGS(&webViewController3)))) {
                   webViewController3->put_BoundsMode(COREWEBVIEW2_BOUNDS_MODE_USE_RAW_PIXELS);
                   webViewController3->put_ShouldDetectMonitorScaleChanges(FALSE);
-                  webViewController3->put_RasterizationScale(1.0);
+                  webViewController3->put_RasterizationScale(get_current_scale_factor(parentWindow));
                 }
 
                 completionHandler(std::move(env), std::move(webViewController), std::move(compositionController));
@@ -3799,7 +3803,7 @@ namespace flutter_inappwebview_plugin
   }
 
   // flutter_view
-  void InAppWebView::setSurfaceSize(size_t width, size_t height, float scale_factor)
+  void InAppWebView::setSurfaceSize(double width, double height, float scale_factor)
   {
     if (!webViewController) {
       return;
@@ -3807,16 +3811,24 @@ namespace flutter_inappwebview_plugin
 
     if (surface_ && width > 0 && height > 0) {
       scaleFactor_ = scale_factor;
+      // Compute physical pixel dimensions from full-precision logical size,
+      // then round to the nearest integer to match Flutter's physical pixel
+      // grid.  Truncating the logical dimensions to size_t before scaling
+      // (the old code) could lose a fractional pixel, causing a 1 px
+      // mismatch between the texture and what Flutter expects – which with
+      // FilterQuality.none produces nearest-neighbour artefacts on text.
       auto scaled_width = width * scale_factor;
       auto scaled_height = height * scale_factor;
+      LONG phys_width = static_cast<LONG>(std::round(scaled_width));
+      LONG phys_height = static_cast<LONG>(std::round(scaled_height));
 
       RECT bounds;
       bounds.left = 0;
       bounds.top = 0;
-      bounds.right = static_cast<LONG>(scaled_width);
-      bounds.bottom = static_cast<LONG>(scaled_height);
+      bounds.right = phys_width;
+      bounds.bottom = phys_height;
 
-      surface_->put_Size({ scaled_width, scaled_height });
+      surface_->put_Size({ static_cast<float>(phys_width), static_cast<float>(phys_height) });
 
       wil::com_ptr<ICoreWebView2Controller3> webViewController3;
       if (SUCCEEDED(webViewController->QueryInterface(IID_PPV_ARGS(&webViewController3)))) {
@@ -3828,20 +3840,20 @@ namespace flutter_inappwebview_plugin
       }
 
       if (surfaceSizeChangedCallback_) {
-        surfaceSizeChangedCallback_(width, height);
+        surfaceSizeChangedCallback_(static_cast<size_t>(phys_width), static_cast<size_t>(phys_height));
       }
     }
   }
 
-  void InAppWebView::setPosition(size_t x, size_t y, float scale_factor)
+  void InAppWebView::setPosition(double x, double y, float scale_factor)
   {
     if (!webViewController) {
       return;
     }
 
     scaleFactor_ = scale_factor;
-    auto scaled_x = static_cast<int>(x * scale_factor);
-    auto scaled_y = static_cast<int>(y * scale_factor);
+    auto scaled_x = static_cast<int>(std::round(x * scale_factor));
+    auto scaled_y = static_cast<int>(std::round(y * scale_factor));
 
     // The WebView's parent HWND is a WS_CHILD of the Flutter window,
     // so SetWindowPos coordinates are relative to the Flutter window's

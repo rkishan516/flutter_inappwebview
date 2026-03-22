@@ -304,8 +304,7 @@ namespace flutter_inappwebview_plugin
       if (size && view) {
         const auto [width, height, scale_factor] = size.value();
 
-        view->setSurfaceSize(static_cast<size_t>(width),
-          static_cast<size_t>(height),
+        view->setSurfaceSize(width, height,
           static_cast<float>(scale_factor));
 
         texture_bridge_->Start();
@@ -318,8 +317,7 @@ namespace flutter_inappwebview_plugin
       if (position && view) {
         const auto [x, y, scale_factor] = position.value();
 
-        view->setPosition(static_cast<size_t>(x),
-          static_cast<size_t>(y),
+        view->setPosition(x, y,
           static_cast<float>(scale_factor));
 
         return result->Success();

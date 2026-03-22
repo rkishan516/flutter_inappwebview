@@ -899,6 +899,16 @@ class _CustomPlatformViewState extends State<CustomPlatformView>
     );
   }
 
+  double get _effectiveScaleFactor {
+    if (widget.scaleFactor != null) return widget.scaleFactor!;
+    final ctx = _key.currentContext;
+    if (ctx != null) {
+      return View.of(ctx).devicePixelRatio;
+    }
+    // ignore: deprecated_member_use
+    return window.devicePixelRatio;
+  }
+
   void _reportSurfaceSize() async {
     final box = _key.currentContext?.findRenderObject() as RenderBox?;
     if (box != null) {
@@ -906,7 +916,7 @@ class _CustomPlatformViewState extends State<CustomPlatformView>
       unawaited(
         _controller._setSize(
           box.size,
-          widget.scaleFactor ?? window.devicePixelRatio,
+          _effectiveScaleFactor,
         ),
       );
     }
@@ -920,7 +930,7 @@ class _CustomPlatformViewState extends State<CustomPlatformView>
       unawaited(
         _controller._setPosition(
           position,
-          widget.scaleFactor ?? window.devicePixelRatio,
+          _effectiveScaleFactor,
         ),
       );
     }
