@@ -120,29 +120,46 @@ namespace flutter_inappwebview_plugin
     std::shared_ptr<flutter_inappwebview_plugin::InAppWebView> webView)
     : hwnd_(hwnd), view(std::move(webView)), texture_registrar_(texture_registrar)
   {
+    // Hold the bridge via shared_ptr and capture weak_ptrs in the texture
+    // descriptor callbacks. The Flutter engine can invoke these callbacks
+    // from the GPU/raster thread after the platform view is destroyed
+    // (UnregisterTexture is asynchronous and pending presents drain after
+    // it returns); a raw pointer would dangle and crash inside
+    // FlutterDesktopTextureRegistrarMarkExternalTextureFrameAvailable /
+    // InternalFlutterGpu_Texture_AsImage.
 #ifdef HAVE_FLUTTER_D3D_TEXTURE
-    texture_bridge_ =
-      std::make_unique<TextureBridgeGpu>(graphics_context, view->surface());
+    auto gpu_bridge =
+      std::make_shared<TextureBridgeGpu>(graphics_context, view->surface());
+    std::weak_ptr<TextureBridgeGpu> weak_bridge = gpu_bridge;
+    texture_bridge_ = gpu_bridge;
 
     flutter_texture_ =
       std::make_unique<flutter::TextureVariant>(flutter::GpuSurfaceTexture(
         kFlutterDesktopGpuSurfaceTypeDxgiSharedHandle,
-        [bridge = static_cast<TextureBridgeGpu*>(texture_bridge_.get())](
+        [weak_bridge](
           size_t width,
           size_t height) -> const FlutterDesktopGpuSurfaceDescriptor*
         {
-          return bridge->GetSurfaceDescriptor(width, height);
+          if (auto bridge = weak_bridge.lock()) {
+            return bridge->GetSurfaceDescriptor(width, height);
+          }
+          return nullptr;
         }));
 #else
-    texture_bridge_ = std::make_unique<TextureBridgeFallback>(
+    auto fallback_bridge = std::make_shared<TextureBridgeFallback>(
       graphics_context, view->surface());
+    std::weak_ptr<TextureBridgeFallback> weak_bridge = fallback_bridge;
+    texture_bridge_ = fallback_bridge;
 
     flutter_texture_ =
       std::make_unique<flutter::TextureVariant>(flutter::PixelBufferTexture(
-        [bridge = static_cast<TextureBridgeFallback*>(texture_bridge_.get())](
+        [weak_bridge](
           size_t width, size_t height) -> const FlutterDesktopPixelBuffer*
         {
-          return bridge->CopyPixelBuffer(width, height);
+          if (auto bridge = weak_bridge.lock()) {
+            return bridge->CopyPixelBuffer(width, height);
+          }
+          return nullptr;
         }));
 #endif
 
