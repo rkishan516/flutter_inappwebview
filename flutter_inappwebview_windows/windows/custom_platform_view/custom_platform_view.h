@@ -33,12 +33,7 @@ namespace flutter_inappwebview_plugin
     void UnregisterMethodCallHandler() const;
   private:
     HWND hwnd_;
-    std::unique_ptr<flutter::TextureVariant> flutter_texture_;
-    // shared_ptr (not unique_ptr) so the GpuSurfaceTexture /
-    // PixelBufferTexture descriptor callbacks can hold weak_ptrs and
-    // safely no-op if the bridge has already been destroyed. The Flutter
-    // engine can invoke those callbacks from the GPU/raster thread after
-    // UnregisterTexture returns, so a raw pointer would dangle.
+    std::shared_ptr<flutter::TextureVariant> flutter_texture_;
     std::shared_ptr<TextureBridge> texture_bridge_;
     std::unique_ptr<flutter::EventSink<flutter::EncodableValue>> event_sink_;
     std::unique_ptr<flutter::EventChannel<flutter::EncodableValue>>

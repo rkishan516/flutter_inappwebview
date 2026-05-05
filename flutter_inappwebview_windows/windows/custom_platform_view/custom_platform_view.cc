@@ -134,7 +134,7 @@ namespace flutter_inappwebview_plugin
     texture_bridge_ = gpu_bridge;
 
     flutter_texture_ =
-      std::make_unique<flutter::TextureVariant>(flutter::GpuSurfaceTexture(
+      std::make_shared<flutter::TextureVariant>(flutter::GpuSurfaceTexture(
         kFlutterDesktopGpuSurfaceTypeDxgiSharedHandle,
         [weak_bridge](
           size_t width,
@@ -152,7 +152,7 @@ namespace flutter_inappwebview_plugin
     texture_bridge_ = fallback_bridge;
 
     flutter_texture_ =
-      std::make_unique<flutter::TextureVariant>(flutter::PixelBufferTexture(
+      std::make_shared<flutter::TextureVariant>(flutter::PixelBufferTexture(
         [weak_bridge](
           size_t width, size_t height) -> const FlutterDesktopPixelBuffer*
         {
@@ -224,7 +224,10 @@ namespace flutter_inappwebview_plugin
       texture_bridge_->SetOnFrameAvailable(nullptr);
     }
 
-    texture_registrar_->UnregisterTexture(texture_id_, nullptr);
+    texture_registrar_->UnregisterTexture(
+      texture_id_,
+      [bridge = std::move(texture_bridge_),
+        texture = std::move(flutter_texture_)]() {});
   }
 
   void CustomPlatformView::RegisterEventHandlers()
