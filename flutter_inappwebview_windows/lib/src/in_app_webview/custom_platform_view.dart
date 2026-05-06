@@ -127,46 +127,71 @@ class CustomPlatformViewController
     if (_isDisposed) {
       return;
     }
-    _textureId = (await _pluginChannel.invokeMethod<int>(
-      'createInAppWebView',
-      arguments,
-    ))!;
-
-    _methodChannel = MethodChannel(
-      'com.pichillilorenzo/custom_platform_view_$_textureId',
-    );
-    _eventChannel = EventChannel(
-      'com.pichillilorenzo/custom_platform_view_${_textureId}_events',
-    );
-    _eventStreamSubscription = _eventChannel.receiveBroadcastStream().listen((
-      event,
-    ) {
-      final map = event as Map<dynamic, dynamic>;
-      switch (map['type']) {
-        case 'cursorChanged':
-          _cursorStreamController.add(_getCursorByName(map['value']));
-          break;
+    try {
+      final textureId = await _pluginChannel.invokeMethod<int>(
+        'createInAppWebView',
+        arguments,
+      );
+      if (textureId == null) {
+        throw PlatformException(
+          code: '0',
+          message: 'createInAppWebView returned null texture id',
+        );
       }
-    });
+      _textureId = textureId;
 
-    _methodChannel.setMethodCallHandler((call) {
-      throw MissingPluginException('Unknown method ${call.method}');
-    });
+      _methodChannel = MethodChannel(
+        'com.pichillilorenzo/custom_platform_view_$_textureId',
+      );
+      _eventChannel = EventChannel(
+        'com.pichillilorenzo/custom_platform_view_${_textureId}_events',
+      );
+      _eventStreamSubscription = _eventChannel.receiveBroadcastStream().listen((
+        event,
+      ) {
+        final map = event as Map<dynamic, dynamic>;
+        switch (map['type']) {
+          case 'cursorChanged':
+            _cursorStreamController.add(_getCursorByName(map['value']));
+            break;
+        }
+      });
 
-    value = value.copyWith(isInitialized: true);
+      _methodChannel.setMethodCallHandler((call) {
+        throw MissingPluginException('Unknown method ${call.method}');
+      });
 
-    _creatingCompleter.complete();
+      value = value.copyWith(isInitialized: true);
 
-    onPlatformViewCreated?.call(_textureId);
+      if (!_creatingCompleter.isCompleted) {
+        _creatingCompleter.complete();
+      }
+
+      onPlatformViewCreated?.call(_textureId);
+    } catch (e, s) {
+      if (!_creatingCompleter.isCompleted) {
+        _creatingCompleter.completeError(e, s);
+      }
+      rethrow;
+    }
   }
 
   @override
   Future<void> dispose() async {
-    await _creatingCompleter.future;
+    // Wait for initialization to settle, but never let a failed init
+    // (which surfaces as an error on _creatingCompleter.future) prevent
+    // the rest of dispose from running.
+    try {
+      await _creatingCompleter.future;
+    } catch (_) {}
     if (!_isDisposed) {
       _isDisposed = true;
       await _eventStreamSubscription?.cancel();
-      await _pluginChannel.invokeMethod('dispose', {"id": _textureId});
+      if (value.isInitialized) {
+        try {
+          await _pluginChannel.invokeMethod('dispose', {"id": _textureId});
+        } catch (_) {}
+      }
     }
     super.dispose();
   }
@@ -353,12 +378,27 @@ class _CustomPlatformViewState extends State<CustomPlatformView>
 
     _platformUtil.addListener(this);
 
-    _controller.initialize(
-      onPlatformViewCreated: (id) {
-        widget.onPlatformViewCreated?.call(id);
-        setState(() {});
-      },
-      arguments: widget.creationParams,
+    unawaited(
+      _controller
+          .initialize(
+            onPlatformViewCreated: (id) {
+              widget.onPlatformViewCreated?.call(id);
+              if (mounted) setState(() {});
+            },
+            arguments: widget.creationParams,
+          )
+          .catchError((Object e, StackTrace s) {
+            FlutterError.reportError(
+              FlutterErrorDetails(
+                exception: e,
+                stack: s,
+                library: 'flutter_inappwebview_windows',
+                context: ErrorDescription(
+                  'while initializing CustomPlatformView',
+                ),
+              ),
+            );
+          }),
     );
 
     _listener = AppLifecycleListener(
@@ -912,7 +952,12 @@ class _CustomPlatformViewState extends State<CustomPlatformView>
   void _reportSurfaceSize() async {
     final box = _key.currentContext?.findRenderObject() as RenderBox?;
     if (box != null) {
-      await _controller.ready;
+      try {
+        await _controller.ready;
+      } catch (_) {
+        return;
+      }
+      if (!_controller.value.isInitialized) return;
       unawaited(
         _controller._setSize(
           box.size,
@@ -925,7 +970,12 @@ class _CustomPlatformViewState extends State<CustomPlatformView>
   void _reportWidgetPosition() async {
     final box = _key.currentContext?.findRenderObject() as RenderBox?;
     if (box != null) {
-      await _controller.ready;
+      try {
+        await _controller.ready;
+      } catch (_) {
+        return;
+      }
+      if (!_controller.value.isInitialized) return;
       final position = box.localToGlobal(Offset.zero);
       unawaited(
         _controller._setPosition(
