@@ -6,6 +6,7 @@
 #include <chrono>
 #include <cstdint>
 #include <functional>
+#include <memory>
 #include <mutex>
 #include <optional>
 
@@ -18,7 +19,7 @@ namespace flutter_inappwebview_plugin
     size_t height;
   } Size;
 
-  class TextureBridge {
+  class TextureBridge : public std::enable_shared_from_this<TextureBridge> {
   public:
     typedef std::function<void()> FrameAvailableCallback;
     typedef std::function<void(Size size)> SurfaceSizeChangedCallback;

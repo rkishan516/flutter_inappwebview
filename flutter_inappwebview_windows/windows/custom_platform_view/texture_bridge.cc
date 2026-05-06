@@ -61,15 +61,18 @@ namespace flutter_inappwebview_plugin
       kNumBuffers, size);
     assert(frame_pool_);
 
+    std::weak_ptr<TextureBridge> weak_self = weak_from_this();
     frame_pool_->add_FrameArrived(
       Microsoft::WRL::Callback<ABI::Windows::Foundation::ITypedEventHandler<
       ABI::Windows::Graphics::Capture::Direct3D11CaptureFramePool*,
       IInspectable*>>(
-        [this](ABI::Windows::Graphics::Capture::IDirect3D11CaptureFramePool*
-          pool,
+        [weak_self](
+          ABI::Windows::Graphics::Capture::IDirect3D11CaptureFramePool* pool,
           IInspectable* args) -> HRESULT
         {
-          OnFrameArrived();
+          if (auto self = weak_self.lock()) {
+            self->OnFrameArrived();
+          }
           return S_OK;
         })
       .Get(),
