@@ -135,14 +135,14 @@ namespace flutter_inappwebview_plugin
     this->inAppBrowser = inAppBrowser;
   }
 
-  void InAppWebView::createInAppWebViewEnv(const HWND parentWindow, const bool& willBeSurface, WebViewEnvironment* webViewEnvironment, const std::shared_ptr<InAppWebViewSettings> initialSettings, std::function<void(wil::com_ptr<ICoreWebView2Environment> webViewEnv,
+  void InAppWebView::createInAppWebViewEnv(const HWND parentWindow, const bool& willBeSurface, WebViewEnvironment* webViewEnvironment, const std::shared_ptr<InAppWebViewSettings> initialSettings, std::function<void(HRESULT errorCode, wil::com_ptr<ICoreWebView2Environment> webViewEnv,
     wil::com_ptr<ICoreWebView2Controller> webViewController,
     wil::com_ptr<ICoreWebView2CompositionController> webViewCompositionController)> completionHandler)
   {
     auto callback = [parentWindow, willBeSurface, completionHandler, initialSettings](HRESULT result, wil::com_ptr<ICoreWebView2Environment> env) -> HRESULT
       {
         if (failedAndLog(result) || !env) {
-          completionHandler(nullptr, nullptr, nullptr);
+          completionHandler(SUCCEEDED(result) ? E_FAIL : result, nullptr, nullptr, nullptr);
           return E_FAIL;
         }
 
@@ -165,7 +165,7 @@ namespace flutter_inappwebview_plugin
                 wil::com_ptr<ICoreWebView2Controller3> webViewController = compositionController.try_query<ICoreWebView2Controller3>();
 
                 if (failedAndLog(result) || !webViewController) {
-                  completionHandler(nullptr, nullptr, nullptr);
+                  completionHandler(SUCCEEDED(result) ? E_NOINTERFACE : result, nullptr, nullptr, nullptr);
                   return E_FAIL;
                 }
 
@@ -179,7 +179,7 @@ namespace flutter_inappwebview_plugin
                   webViewController3->put_RasterizationScale(get_current_scale_factor(parentWindow));
                 }
 
-                completionHandler(std::move(env), std::move(webViewController), std::move(compositionController));
+                completionHandler(S_OK, std::move(env), std::move(webViewController), std::move(compositionController));
                 return S_OK;
               }
             ).Get()));
@@ -191,7 +191,7 @@ namespace flutter_inappwebview_plugin
                 wil::com_ptr<ICoreWebView2Controller3> webViewController = compositionController.try_query<ICoreWebView2Controller3>();
 
                 if (failedAndLog(result) || !webViewController) {
-                  completionHandler(nullptr, nullptr, nullptr);
+                  completionHandler(SUCCEEDED(result) ? E_NOINTERFACE : result, nullptr, nullptr, nullptr);
                   return E_FAIL;
                 }
 
@@ -202,7 +202,7 @@ namespace flutter_inappwebview_plugin
                   webViewController3->put_RasterizationScale(get_current_scale_factor(parentWindow));
                 }
 
-                completionHandler(std::move(env), std::move(webViewController), std::move(compositionController));
+                completionHandler(S_OK, std::move(env), std::move(webViewController), std::move(compositionController));
                 return S_OK;
               }
             ).Get()));
@@ -214,11 +214,11 @@ namespace flutter_inappwebview_plugin
               [completionHandler, env](HRESULT result, wil::com_ptr<ICoreWebView2Controller> controller) -> HRESULT
               {
                 if (failedAndLog(result) || !controller) {
-                  completionHandler(nullptr, nullptr, nullptr);
+                  completionHandler(SUCCEEDED(result) ? E_FAIL : result, nullptr, nullptr, nullptr);
                   return E_FAIL;
                 }
 
-                completionHandler(std::move(env), std::move(controller), nullptr);
+                completionHandler(S_OK, std::move(env), std::move(controller), nullptr);
                 return S_OK;
               }).Get()));
           }
@@ -227,11 +227,11 @@ namespace flutter_inappwebview_plugin
               [completionHandler, env](HRESULT result, wil::com_ptr<ICoreWebView2Controller> controller) -> HRESULT
               {
                 if (failedAndLog(result) || !controller) {
-                  completionHandler(nullptr, nullptr, nullptr);
+                  completionHandler(SUCCEEDED(result) ? E_FAIL : result, nullptr, nullptr, nullptr);
                   return E_FAIL;
                 }
 
-                completionHandler(std::move(env), std::move(controller), nullptr);
+                completionHandler(S_OK, std::move(env), std::move(controller), nullptr);
                 return S_OK;
               }).Get()));
           }
@@ -250,7 +250,7 @@ namespace flutter_inappwebview_plugin
     }
 
     if (failedAndLog(hr)) {
-      completionHandler(nullptr, nullptr, nullptr);
+      completionHandler(hr, nullptr, nullptr, nullptr);
     }
   }
 

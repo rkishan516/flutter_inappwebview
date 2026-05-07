@@ -79,7 +79,7 @@ namespace flutter_inappwebview_plugin
       ? plugin->webViewEnvironmentManager->webViewEnvironments.at(params.webViewEnvironmentId.value()).get() : nullptr;
 
     InAppWebView::createInAppWebViewEnv(m_hWnd, false, webViewEnvironment, params.initialWebViewSettings,
-      [this, params, webViewParams](wil::com_ptr<ICoreWebView2Environment> webViewEnv, wil::com_ptr<ICoreWebView2Controller> webViewController, wil::com_ptr<ICoreWebView2CompositionController> webViewCompositionController) -> void
+      [this, params, webViewParams](HRESULT errorCode, wil::com_ptr<ICoreWebView2Environment> webViewEnv, wil::com_ptr<ICoreWebView2Controller> webViewController, wil::com_ptr<ICoreWebView2CompositionController> webViewCompositionController) -> void
       {
         if (webViewEnv && webViewController) {
           webView = std::make_unique<InAppWebView>(this, this->plugin, webViewParams, m_hWnd, std::move(webViewEnv), std::move(webViewController), nullptr);
@@ -100,7 +100,9 @@ namespace flutter_inappwebview_plugin
           }
         }
         else {
-          std::cerr << "Cannot create the InAppWebView instance!" << std::endl;
+          char hexCode[16] = {};
+          snprintf(hexCode, sizeof(hexCode), "0x%08X", (unsigned int)errorCode);
+          std::cerr << "Cannot create the InAppWebView instance: " << getHRMessage(errorCode) << " (" << hexCode << ")" << std::endl;
           close();
         }
       });

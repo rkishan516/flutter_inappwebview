@@ -175,7 +175,8 @@ namespace flutter_inappwebview_plugin
     auto contextMenuMap = get_fl_map_value<flutter::EncodableMap>(*arguments, "contextMenu", flutter::EncodableMap{});
 
     InAppWebView::createInAppWebViewEnv(hwnd, true, webViewEnvironment, initialSettings,
-      [=](wil::com_ptr<ICoreWebView2Environment> webViewEnv,
+      [=](HRESULT errorCode,
+        wil::com_ptr<ICoreWebView2Environment> webViewEnv,
         wil::com_ptr<ICoreWebView2Controller> webViewController,
         wil::com_ptr<ICoreWebView2CompositionController> webViewCompositionController)
       {
@@ -231,7 +232,12 @@ namespace flutter_inappwebview_plugin
           result_->Success(textureId);
         }
         else {
-          result_->Error("0", "Cannot create the InAppWebView instance!");
+          char hexCode[16] = {};
+          snprintf(hexCode, sizeof(hexCode), "0x%08X", (unsigned int)errorCode);
+          result_->Error(
+            std::string(hexCode),
+            "Cannot create the InAppWebView instance: " + getHRMessage(errorCode) + " (" + hexCode + ")"
+          );
         }
       }
     );
