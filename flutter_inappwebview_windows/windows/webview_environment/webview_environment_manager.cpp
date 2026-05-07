@@ -138,6 +138,10 @@ namespace flutter_inappwebview_plugin
     plugin = nullptr;
     defaultEnvironment_ = nullptr;
     if (hwnd_) {
+      // See InAppWebView::~InAppWebView for rationale: detach from any
+      // Flutter view ancestor first so DestroyWindow doesn't trigger the
+      // engine's UpdatePopupPosition AV (Sentry DESKTOP-NATIVE-3J).
+      ::SetParent(hwnd_, HWND_MESSAGE);
       DestroyWindow(hwnd_);
     }
   }
