@@ -130,27 +130,19 @@ namespace flutter_inappwebview_plugin
     auto webViewEnvironmentId = get_optional_fl_map_value<std::string>(*arguments, "webViewEnvironmentId");
     auto keepAliveId = get_optional_fl_map_value<std::string>(*arguments, "keepAliveId");
     auto windowId = get_optional_fl_map_value<int64_t>(*arguments, "windowId");
-    auto viewId = get_optional_fl_map_value<int64_t>(*arguments, "viewId");
 
-    // Resolve Flutter view by id if provided (multi-view), else fall back to implicit view
-    std::shared_ptr<flutter::FlutterView> flutterView = viewId.has_value()
-      ? plugin->registrar->GetViewById(viewId.value())
-      : std::shared_ptr<flutter::FlutterView>(plugin->registrar->GetView(), [](flutter::FlutterView*){});
-
-    HWND parentWindow = HWND_MESSAGE;
-    RECT bounds = { 0, 0, 0, 0 };
-    if (flutterView) {
-      parentWindow = flutterView->GetNativeWindow();
-      GetClientRect(parentWindow, &bounds);
-    }
-
-    // Create as WS_CHILD with WS_DISABLED to prevent focus changes
-    // This keeps focus on Flutter window (no app lifecycle changes)
-    // Mouse input works via SendMouseInput on composition controller
-    // Keyboard input is forwarded via JavaScript injection
-    auto hwnd = CreateWindowEx(0, windowClass_.lpszClassName, L"", WS_CHILD | WS_DISABLED, 0,
-      0, bounds.right - bounds.left, bounds.bottom - bounds.top,
-      parentWindow,
+    // Host the WebView2 under the message-only window instead of the Flutter
+    // view. Composition mode renders to a texture, so the host hwnd never has
+    // to be on-screen; keeping it out of the Flutter view's window hierarchy
+    // prevents the engine's WindowManager subclass from tracking it as a
+    // popup and crashing inside UpdatePopupPosition / OnDestroyWindow when
+    // its state goes stale (Sentry DESKTOP-NATIVE-3J). Mouse input is
+    // forwarded via SendMouseInput on the composition controller and
+    // keyboard via JS injection, so WS_CHILD parenting was not required for
+    // input — just for focus/lifecycle, which HWND_MESSAGE handles cleanly.
+    auto hwnd = CreateWindowEx(0, windowClass_.lpszClassName, L"", WS_DISABLED, 0,
+      0, 0, 0,
+      HWND_MESSAGE,
       nullptr,
       windowClass_.hInstance, nullptr);
 

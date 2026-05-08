@@ -63,20 +63,18 @@ namespace flutter_inappwebview_plugin
     auto initialUserScriptList = get_optional_fl_map_value<flutter::EncodableList>(params, "initialUserScripts");
     auto webViewEnvironmentId = get_optional_fl_map_value<std::string>(params, "webViewEnvironmentId");
 
-    RECT bounds = { 0, 0, 0, 0 };
-    HWND parentWindow = HWND_MESSAGE;
-    auto flutterView = plugin->registrar->GetView();
-    if (flutterView) {
-      parentWindow = flutterView->GetNativeWindow();
-      GetClientRect(parentWindow, &bounds);
-    }
-
-    auto initialWidth = initialSize->width >= 0 ? initialSize->width : bounds.right - bounds.left;
-    auto initialHeight = initialSize->height >= 0 ? initialSize->height : bounds.bottom - bounds.top;
+    // Always host headless WebViews under the message-only window. Headless
+    // means there is nothing to display, so there is no reason to attach to
+    // the Flutter view's hierarchy — and doing so caused the engine's
+    // WindowManager subclass to track this hwnd and crash inside
+    // UpdatePopupPosition / OnDestroyWindow on stale state (Sentry
+    // DESKTOP-NATIVE-3J).
+    auto initialWidth = initialSize->width >= 0 ? initialSize->width : 0;
+    auto initialHeight = initialSize->height >= 0 ? initialSize->height : 0;
 
     auto hwnd = CreateWindowEx(0, windowClass_.lpszClassName, L"", 0, 0,
       0, (int)initialWidth, (int)initialHeight,
-      parentWindow,
+      HWND_MESSAGE,
       nullptr,
       windowClass_.hInstance, nullptr);
 

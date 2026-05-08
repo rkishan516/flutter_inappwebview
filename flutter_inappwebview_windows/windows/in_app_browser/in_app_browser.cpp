@@ -110,6 +110,14 @@ namespace flutter_inappwebview_plugin
 
   void InAppBrowser::close() const
   {
+    // See InAppWebView::~InAppWebView for rationale: when m_hWnd is
+    // WS_CHILDWINDOW (windowType != window), DestroyWindow sends
+    // WM_PARENTNOTIFY(WM_DESTROY) to the Flutter view, which routes
+    // through the engine's WindowManager subclass and crashes inside
+    // UpdatePopupPosition (Sentry DESKTOP-NATIVE-3J). Reparenting to
+    // HWND_MESSAGE makes the destroy invisible to the Flutter view's
+    // subclass proc. Harmless for top-level windows.
+    ::SetParent(m_hWnd, HWND_MESSAGE);
     DestroyWindow(m_hWnd);
   }
 

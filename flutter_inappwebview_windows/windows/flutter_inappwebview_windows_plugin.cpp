@@ -63,6 +63,22 @@ namespace flutter_inappwebview_plugin
     WPARAM wParam,
     LPARAM lParam)
   {
+    // When the Flutter view is being closed/destroyed, detach any
+    // InAppBrowser WS_CHILDWINDOW instances from it before the OS
+    // cascade-destroys them. Otherwise the engine's WindowManager subclass
+    // crashes inside UpdatePopupPosition / OnDestroyWindow on stale popup
+    // metadata (Sentry DESKTOP-NATIVE-3J). Orderly destruction (close()
+    // and dtors) already reparents — this guards the cascade path.
+    if ((message == WM_CLOSE || message == WM_DESTROY) && inAppBrowserManager) {
+      for (auto& entry : inAppBrowserManager->browsers) {
+        const auto& browser = entry.second;
+        HWND browserHwnd = browser ? browser->getHWND() : nullptr;
+        if (browserHwnd && ::GetParent(browserHwnd) == hWnd) {
+          ::SetParent(browserHwnd, HWND_MESSAGE);
+        }
+      }
+    }
+
     std::optional<LRESULT> result = std::nullopt;
 
     if (platformUtil) {
