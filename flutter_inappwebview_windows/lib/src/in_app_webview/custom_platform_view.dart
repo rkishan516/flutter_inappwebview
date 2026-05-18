@@ -950,40 +950,50 @@ class _CustomPlatformViewState extends State<CustomPlatformView>
   }
 
   void _reportSurfaceSize() async {
-    final box = _key.currentContext?.findRenderObject() as RenderBox?;
-    if (box != null) {
-      try {
-        await _controller.ready;
-      } catch (_) {
-        return;
-      }
-      if (!_controller.value.isInitialized) return;
-      unawaited(
-        _controller._setSize(
-          box.size,
-          _effectiveScaleFactor,
-        ),
-      );
+    if (_key.currentContext?.findRenderObject() is! RenderBox) return;
+    try {
+      await _controller.ready;
+    } catch (_) {
+      return;
     }
+    if (!mounted || !_controller.value.isInitialized) return;
+    // Re-resolve after the await: the State may have been deactivated
+    // and the original RenderBox detached from the pipeline.
+    final box = _key.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null || !box.attached || !box.hasSize) return;
+    unawaited(
+      _controller._setSize(
+        box.size,
+        _effectiveScaleFactor,
+      ),
+    );
   }
 
   void _reportWidgetPosition() async {
-    final box = _key.currentContext?.findRenderObject() as RenderBox?;
-    if (box != null) {
-      try {
-        await _controller.ready;
-      } catch (_) {
-        return;
-      }
-      if (!_controller.value.isInitialized) return;
-      final position = box.localToGlobal(Offset.zero);
-      unawaited(
-        _controller._setPosition(
-          position,
-          _effectiveScaleFactor,
-        ),
-      );
+    if (_key.currentContext?.findRenderObject() is! RenderBox) return;
+    try {
+      await _controller.ready;
+    } catch (_) {
+      return;
     }
+    if (!mounted || !_controller.value.isInitialized) return;
+    // Re-resolve after the await: the State may have been deactivated
+    // and the original RenderBox detached from the pipeline, which
+    // makes localToGlobal throw a null-check error in getTransformTo.
+    final box = _key.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null || !box.attached) return;
+    final Offset position;
+    try {
+      position = box.localToGlobal(Offset.zero);
+    } on Object {
+      return;
+    }
+    unawaited(
+      _controller._setPosition(
+        position,
+        _effectiveScaleFactor,
+      ),
+    );
   }
 
   @override
