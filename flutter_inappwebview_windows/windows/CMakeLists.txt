@@ -42,6 +42,8 @@ add_custom_command(
 list(APPEND PLUGIN_SOURCES
   "flutter_inappwebview_windows_plugin.cpp"
   "flutter_inappwebview_windows_plugin.h"
+  "plugin_window_registry.cpp"
+  "plugin_window_registry.h"
   "utils/log.h"
   "utils/defer.h"
   "utils/timer.h"

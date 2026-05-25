@@ -66,6 +66,9 @@ namespace flutter_inappwebview_plugin
     );
 
     SetLayeredWindowAttributes(m_hWnd, 0, (BYTE)(255 * settings->windowAlphaValue), LWA_ALPHA);
+    if (plugin->windowRegistry) {
+      plugin->windowRegistry->Register(m_hWnd, "InAppBrowser");
+    }
 
     ShowWindow(m_hWnd, settings->hidden ? SW_HIDE : SW_SHOW);
 
@@ -110,13 +113,11 @@ namespace flutter_inappwebview_plugin
 
   void InAppBrowser::close() const
   {
-    // See InAppWebView::~InAppWebView for rationale: when m_hWnd is
-    // WS_CHILDWINDOW (windowType != window), DestroyWindow sends
-    // WM_PARENTNOTIFY(WM_DESTROY) to the Flutter view, which routes
-    // through the engine's WindowManager subclass and crashes inside
-    // UpdatePopupPosition (Sentry DESKTOP-NATIVE-3J). Reparenting to
-    // HWND_MESSAGE makes the destroy invisible to the Flutter view's
-    // subclass proc. Harmless for top-level windows.
+    if (plugin && plugin->windowRegistry) {
+      plugin->windowRegistry->DestroyRegisteredWindow(m_hWnd, "InAppBrowser close");
+      return;
+    }
+
     ::SetParent(m_hWnd, HWND_MESSAGE);
     DestroyWindow(m_hWnd);
   }
@@ -267,7 +268,12 @@ namespace flutter_inappwebview_plugin
   {
     debugLog("dealloc InAppBrowser");
     webView.reset();
-    SetWindowLongPtr(m_hWnd, GWLP_USERDATA, 0);
+    if (m_hWnd && ::IsWindow(m_hWnd)) {
+      SetWindowLongPtr(m_hWnd, GWLP_USERDATA, 0);
+    }
+    if (plugin && plugin->windowRegistry) {
+      plugin->windowRegistry->Unregister(m_hWnd);
+    }
     plugin = nullptr;
   }
 

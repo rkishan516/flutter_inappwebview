@@ -3,6 +3,11 @@
 
 #include <flutter/plugin_registrar_windows.h>
 
+#include <memory>
+#include <optional>
+
+#include "plugin_window_registry.h"
+
 namespace flutter_inappwebview_plugin
 {
   class WebViewEnvironmentManager;
@@ -21,6 +26,7 @@ namespace flutter_inappwebview_plugin
     std::unique_ptr<HeadlessInAppWebViewManager> headlessInAppWebViewManager;
     std::unique_ptr<CookieManager> cookieManager;
     std::unique_ptr<PlatformUtil> platformUtil;
+    std::unique_ptr<PluginWindowRegistry> windowRegistry;
 
     static void RegisterWithRegistrar(flutter::PluginRegistrarWindows* registrar);
 

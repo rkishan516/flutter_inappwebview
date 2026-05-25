@@ -13,6 +13,8 @@
 
 namespace flutter_inappwebview_plugin
 {
+  class PluginWindowRegistry;
+
   class CustomPlatformView {
   public:
     static inline const wchar_t* CLASS_NAME = L"CustomPlatformView";
@@ -23,6 +25,7 @@ namespace flutter_inappwebview_plugin
       flutter::TextureRegistrar* texture_registrar,
       GraphicsContext* graphics_context,
       HWND hwnd,
+      PluginWindowRegistry* window_registry,
       std::shared_ptr<flutter_inappwebview_plugin::InAppWebView> webView);
     ~CustomPlatformView();
 
@@ -33,6 +36,7 @@ namespace flutter_inappwebview_plugin
     void UnregisterMethodCallHandler() const;
   private:
     HWND hwnd_;
+    PluginWindowRegistry* window_registry_;
     std::shared_ptr<flutter::TextureVariant> flutter_texture_;
     std::shared_ptr<TextureBridge> texture_bridge_;
     std::unique_ptr<flutter::EventSink<flutter::EncodableValue>> event_sink_;

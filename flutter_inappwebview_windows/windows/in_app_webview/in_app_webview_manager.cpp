@@ -145,6 +145,9 @@ namespace flutter_inappwebview_plugin
       HWND_MESSAGE,
       nullptr,
       windowClass_.hInstance, nullptr);
+    if (plugin->windowRegistry) {
+      plugin->windowRegistry->Register(hwnd, "InAppWebViewManager");
+    }
 
     if (keepAliveId.has_value() && map_contains(keepAliveWebViews, keepAliveId.value())) {
       auto webView = std::move(keepAliveWebViews.at(keepAliveId.value())->view);
@@ -153,6 +156,7 @@ namespace flutter_inappwebview_plugin
         plugin->registrar->texture_registrar(),
         graphics_context(),
         hwnd,
+        plugin->windowRegistry.get(),
         std::move(webView));
       auto textureId = customPlatformView->texture_id();
       keepAliveWebViews.insert({ keepAliveId.value(), std::move(customPlatformView) });
@@ -209,6 +213,7 @@ namespace flutter_inappwebview_plugin
             plugin->registrar->texture_registrar(),
             graphics_context(),
             hwnd,
+            plugin->windowRegistry.get(),
             std::move(inAppWebView));
 
           auto textureId = customPlatformView->texture_id();
@@ -224,6 +229,9 @@ namespace flutter_inappwebview_plugin
           result_->Success(textureId);
         }
         else {
+          if (plugin && plugin->windowRegistry) {
+            plugin->windowRegistry->DestroyRegisteredWindow(hwnd, "InAppWebView creation failed");
+          }
           char hexCode[16] = {};
           snprintf(hexCode, sizeof(hexCode), "0x%08X", (unsigned int)errorCode);
           result_->Error(

@@ -77,6 +77,9 @@ namespace flutter_inappwebview_plugin
       HWND_MESSAGE,
       nullptr,
       windowClass_.hInstance, nullptr);
+    if (plugin->windowRegistry) {
+      plugin->windowRegistry->Register(hwnd, "HeadlessInAppWebViewManager");
+    }
 
     auto webViewEnvironment = webViewEnvironmentId.has_value() && map_contains(plugin->webViewEnvironmentManager->webViewEnvironments, webViewEnvironmentId.value())
       ? plugin->webViewEnvironmentManager->webViewEnvironments.at(webViewEnvironmentId.value()).get() : nullptr;
@@ -136,6 +139,9 @@ namespace flutter_inappwebview_plugin
           result_->Success(true);
         }
         else {
+          if (plugin && plugin->windowRegistry) {
+            plugin->windowRegistry->DestroyRegisteredWindow(hwnd, "HeadlessInAppWebView creation failed");
+          }
           char hexCode[16] = {};
           snprintf(hexCode, sizeof(hexCode), "0x%08X", (unsigned int)errorCode);
           result_->Error(

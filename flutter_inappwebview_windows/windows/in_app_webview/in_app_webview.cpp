@@ -4469,25 +4469,31 @@ namespace flutter_inappwebview_plugin
   {
     debugLog("dealloc InAppWebView");
     userContentController = nullptr;
+    HWND parentWindow = nullptr;
+    if (webViewCompositionController && webViewController) {
+      succeededOrLog(webViewController->get_ParentWindow(&parentWindow));
+    }
+    if (parentWindow) {
+      if (plugin && plugin->windowRegistry) {
+        plugin->windowRegistry->DetachForDestroy(parentWindow, "InAppWebView shutdown");
+      }
+      else {
+        ::SetParent(parentWindow, HWND_MESSAGE);
+      }
+    }
     if (webView) {
       failedLog(webView->Stop());
     }
-    HWND parentWindow = nullptr;
-    if (webViewCompositionController && webViewController && succeededOrLog(webViewController->get_ParentWindow(&parentWindow))) {
-      // Detach from the Flutter view before destroying. DestroyWindow on
-      // a WS_CHILD sends WM_PARENTNOTIFY(WM_DESTROY) to the Flutter
-      // window, which routes through the engine's WindowManager subclass
-      // and crashes inside UpdatePopupPosition (Sentry DESKTOP-NATIVE-3J)
-      // because the engine has stale popup metadata for our HWND.
-      // Reparenting to HWND_MESSAGE makes the destroy invisible to the
-      // Flutter view's subclass proc.
-      if (parentWindow) {
-        ::SetParent(parentWindow, HWND_MESSAGE);
-      }
-      DestroyWindow(parentWindow);
-    }
     if (webViewController) {
       failedLog(webViewController->Close());
+    }
+    if (parentWindow) {
+      if (plugin && plugin->windowRegistry) {
+        plugin->windowRegistry->DestroyRegisteredWindow(parentWindow, "InAppWebView shutdown");
+      }
+      else if (::IsWindow(parentWindow)) {
+        DestroyWindow(parentWindow);
+      }
     }
     for (auto& [id, channel] : webMessageChannels_) {
       if (channel) {

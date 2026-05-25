@@ -29,6 +29,7 @@ namespace flutter_inappwebview_plugin
   FlutterInappwebviewWindowsPlugin::FlutterInappwebviewWindowsPlugin(flutter::PluginRegistrarWindows* registrar)
     : registrar(registrar)
   {
+    windowRegistry = std::make_unique<PluginWindowRegistry>();
     webViewEnvironmentManager = std::make_unique<WebViewEnvironmentManager>(this);
     inAppWebViewManager = std::make_unique<InAppWebViewManager>(this);
     inAppBrowserManager = std::make_unique<InAppBrowserManager>(this);
@@ -48,12 +49,13 @@ namespace flutter_inappwebview_plugin
     if (registrar) {
       registrar->UnregisterTopLevelWindowProcDelegate(window_proc_id);
     }
-    webViewEnvironmentManager = nullptr;
     inAppWebViewManager = nullptr;
     inAppBrowserManager = nullptr;
     headlessInAppWebViewManager = nullptr;
+    webViewEnvironmentManager = nullptr;
     cookieManager = nullptr;
     platformUtil = nullptr;
+    windowRegistry = nullptr;
   }
 
 
@@ -63,20 +65,12 @@ namespace flutter_inappwebview_plugin
     WPARAM wParam,
     LPARAM lParam)
   {
-    // When the Flutter view is being closed/destroyed, detach any
-    // InAppBrowser WS_CHILDWINDOW instances from it before the OS
-    // cascade-destroys them. Otherwise the engine's WindowManager subclass
-    // crashes inside UpdatePopupPosition / OnDestroyWindow on stale popup
-    // metadata (Sentry DESKTOP-NATIVE-3J). Orderly destruction (close()
-    // and dtors) already reparents — this guards the cascade path.
-    if ((message == WM_CLOSE || message == WM_DESTROY) && inAppBrowserManager) {
-      for (auto& entry : inAppBrowserManager->browsers) {
-        const auto& browser = entry.second;
-        HWND browserHwnd = browser ? browser->getHWND() : nullptr;
-        if (browserHwnd && ::GetParent(browserHwnd) == hWnd) {
-          ::SetParent(browserHwnd, HWND_MESSAGE);
-        }
-      }
+    // When the Flutter view is being closed/destroyed, detach plugin-owned
+    // HWNDs from it before the OS cascade-destroys them. Otherwise the
+    // engine's WindowManager subclass can crash inside UpdatePopupPosition /
+    // OnDestroyWindow on stale popup metadata (Sentry DESKTOP-NATIVE-3J).
+    if ((message == WM_CLOSE || message == WM_DESTROY || message == WM_NCDESTROY) && windowRegistry) {
+      windowRegistry->DetachWindowsForFlutterWindow(hWnd, message);
     }
 
     std::optional<LRESULT> result = std::nullopt;

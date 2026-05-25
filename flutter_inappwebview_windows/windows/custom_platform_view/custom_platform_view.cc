@@ -1,4 +1,5 @@
 #include "../utils/log.h"
+#include "../plugin_window_registry.h"
 #include "custom_platform_view.h"
 
 #include <flutter/event_stream_handler_functions.h>
@@ -117,8 +118,9 @@ namespace flutter_inappwebview_plugin
     flutter::TextureRegistrar* texture_registrar,
     GraphicsContext* graphics_context,
     HWND hwnd,
+    PluginWindowRegistry* window_registry,
     std::shared_ptr<flutter_inappwebview_plugin::InAppWebView> webView)
-    : hwnd_(hwnd), view(std::move(webView)), texture_registrar_(texture_registrar)
+    : view(std::move(webView)), hwnd_(hwnd), window_registry_(window_registry), texture_registrar_(texture_registrar)
   {
     // Hold the bridge via shared_ptr and capture weak_ptrs in the texture
     // descriptor callbacks. The Flutter engine can invoke these callbacks
@@ -228,6 +230,11 @@ namespace flutter_inappwebview_plugin
       texture_id_,
       [bridge = std::move(texture_bridge_),
         texture = std::move(flutter_texture_)]() {});
+
+    view.reset();
+    if (window_registry_ && hwnd_ && window_registry_->IsRegistered(hwnd_)) {
+      window_registry_->DestroyRegisteredWindow(hwnd_, "CustomPlatformView shutdown");
+    }
   }
 
   void CustomPlatformView::RegisterEventHandlers()

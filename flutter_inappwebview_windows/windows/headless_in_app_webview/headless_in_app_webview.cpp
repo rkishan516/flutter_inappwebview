@@ -53,12 +53,13 @@ namespace flutter_inappwebview_plugin
     }
     webView = nullptr;
     if (parentWindow) {
-      // See InAppWebView::~InAppWebView for rationale: detach from any
-      // Flutter view ancestor before DestroyWindow so the engine's
-      // WindowManager subclass doesn't crash inside UpdatePopupPosition
-      // (Sentry DESKTOP-NATIVE-3J).
-      ::SetParent(parentWindow, HWND_MESSAGE);
-      DestroyWindow(parentWindow);
+      if (plugin && plugin->windowRegistry) {
+        plugin->windowRegistry->DestroyRegisteredWindow(parentWindow, "HeadlessInAppWebView shutdown");
+      }
+      else {
+        ::SetParent(parentWindow, HWND_MESSAGE);
+        DestroyWindow(parentWindow);
+      }
     }
   }
 }

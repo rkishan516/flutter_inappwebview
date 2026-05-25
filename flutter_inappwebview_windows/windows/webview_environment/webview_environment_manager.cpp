@@ -97,19 +97,18 @@ namespace flutter_inappwebview_plugin
     if (hwnd_) {
       return hwnd_;
     }
-    auto parent = plugin->registrar->GetView();
-    HWND parentWindow = nullptr;
-    if (parent) {
-      parentWindow = parent->GetNativeWindow();
-    } else {
-      // Use HWND_MESSAGE for headless scenarios when no Flutter view is available
-      parentWindow = HWND_MESSAGE;
-    }
+    // This host HWND is only used as a WebView2 parent/utility window. Keeping
+    // it message-only prevents Flutter's WindowManager from tracking it as a
+    // popup and receiving destroy notifications for it.
+    HWND parentWindow = HWND_MESSAGE;
     hwnd_ = CreateWindowEx(0, windowClass_.lpszClassName, L"", 0,
       0, 0, 0, 0,
       parentWindow,
       nullptr,
       windowClass_.hInstance, nullptr);
+    if (plugin && plugin->windowRegistry) {
+      plugin->windowRegistry->Register(hwnd_, "WebViewEnvironmentManager");
+    }
     return hwnd_;
   }
 
@@ -135,14 +134,17 @@ namespace flutter_inappwebview_plugin
   {
     debugLog("dealloc WebViewEnvironmentManager");
     webViewEnvironments.clear();
-    plugin = nullptr;
     defaultEnvironment_ = nullptr;
     if (hwnd_) {
-      // See InAppWebView::~InAppWebView for rationale: detach from any
-      // Flutter view ancestor first so DestroyWindow doesn't trigger the
-      // engine's UpdatePopupPosition AV (Sentry DESKTOP-NATIVE-3J).
-      ::SetParent(hwnd_, HWND_MESSAGE);
-      DestroyWindow(hwnd_);
+      if (plugin && plugin->windowRegistry) {
+        plugin->windowRegistry->DestroyRegisteredWindow(hwnd_, "WebViewEnvironmentManager shutdown");
+      }
+      else if (::IsWindow(hwnd_)) {
+        ::SetParent(hwnd_, HWND_MESSAGE);
+        DestroyWindow(hwnd_);
+      }
+      hwnd_ = nullptr;
     }
+    plugin = nullptr;
   }
 }
