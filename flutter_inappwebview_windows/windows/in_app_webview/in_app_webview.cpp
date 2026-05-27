@@ -408,7 +408,19 @@ namespace flutter_inappwebview_plugin
               if (std::holds_alternative<std::string>(titleIt->second)) {
                 title = std::get<std::string>(titleIt->second);
               }
-              contextMenuItems_.push_back({ id, title });
+              std::set<int64_t> targetKinds;
+              auto targetKindsIt = itemMap.find(flutter::EncodableValue("targetKinds"));
+              if (targetKindsIt != itemMap.end() && std::holds_alternative<flutter::EncodableList>(targetKindsIt->second)) {
+                for (const auto& kindVal : std::get<flutter::EncodableList>(targetKindsIt->second)) {
+                  if (std::holds_alternative<int32_t>(kindVal)) {
+                    targetKinds.insert(std::get<int32_t>(kindVal));
+                  }
+                  else if (std::holds_alternative<int64_t>(kindVal)) {
+                    targetKinds.insert(std::get<int64_t>(kindVal));
+                  }
+                }
+              }
+              contextMenuItems_.push_back({ id, title, std::move(targetKinds) });
             }
           }
         }
@@ -2014,10 +2026,24 @@ namespace flutter_inappwebview_plugin
               return S_OK;
             }
 
-            // Get context menu target info for the hit test result
+            // Get context menu target info for the hit test result.
+            //
+            // We compute two things from the WebView2 ContextMenuTarget:
+            //   1. `hitType` / `extra` — passed to the legacy onCreateContextMenu
+            //      Dart callback (kept unchanged for backwards compatibility).
+            //   2. `applicableKinds` — the SET of ContextMenuItemTargetKind values
+            //      that apply to this right-click. A single target can match
+            //      multiple kinds (e.g. an image that is also a link, an
+            //      editable text area). Used below to filter custom menu items
+            //      that declared `targetKinds`.
+            //
+            // Kind integer values mirror the Dart-side ContextMenuItemTargetKind
+            // enum: PAGE=0, IMAGE=1, SELECTED_TEXT=2, AUDIO=3, VIDEO=4, LINK=5,
+            // EDITABLE=6.
             wil::com_ptr<ICoreWebView2ContextMenuTarget> target;
             std::optional<std::string> extra;
             int64_t hitType = 0; // UNKNOWN_TYPE
+            std::set<int64_t> applicableKinds;
             if (SUCCEEDED(args->get_ContextMenuTarget(&target)) && target) {
               COREWEBVIEW2_CONTEXT_MENU_TARGET_KIND kind;
               if (SUCCEEDED(target->get_Kind(&kind))) {
@@ -2025,18 +2051,21 @@ namespace flutter_inappwebview_plugin
                 switch (kind) {
                 case COREWEBVIEW2_CONTEXT_MENU_TARGET_KIND_PAGE:
                   hitType = 0; // UNKNOWN_TYPE
+                  applicableKinds.insert(0); // PAGE
                   if (SUCCEEDED(target->get_PageUri(&uri)) && uri) {
                     extra = wide_to_utf8(uri.get());
                   }
                   break;
                 case COREWEBVIEW2_CONTEXT_MENU_TARGET_KIND_IMAGE:
                   hitType = 5; // IMAGE_TYPE
+                  applicableKinds.insert(1); // IMAGE
                   if (SUCCEEDED(target->get_SourceUri(&uri)) && uri) {
                     extra = wide_to_utf8(uri.get());
                   }
                   break;
                 case COREWEBVIEW2_CONTEXT_MENU_TARGET_KIND_SELECTED_TEXT:
                   hitType = 0; // UNKNOWN_TYPE
+                  applicableKinds.insert(2); // SELECTED_TEXT
                   {
                     wil::unique_cotaskmem_string selText;
                     if (SUCCEEDED(target->get_SelectionText(&selText)) && selText) {
@@ -2045,12 +2074,29 @@ namespace flutter_inappwebview_plugin
                   }
                   break;
                 case COREWEBVIEW2_CONTEXT_MENU_TARGET_KIND_AUDIO:
-                case COREWEBVIEW2_CONTEXT_MENU_TARGET_KIND_VIDEO:
                   hitType = 0; // UNKNOWN_TYPE
+                  applicableKinds.insert(3); // AUDIO
                   if (SUCCEEDED(target->get_SourceUri(&uri)) && uri) {
                     extra = wide_to_utf8(uri.get());
                   }
                   break;
+                case COREWEBVIEW2_CONTEXT_MENU_TARGET_KIND_VIDEO:
+                  hitType = 0; // UNKNOWN_TYPE
+                  applicableKinds.insert(4); // VIDEO
+                  if (SUCCEEDED(target->get_SourceUri(&uri)) && uri) {
+                    extra = wide_to_utf8(uri.get());
+                  }
+                  break;
+                }
+
+                // A target can also have selected text alongside another kind
+                // (e.g. right-clicking on selected text inside an editable
+                // field) — flag SELECTED_TEXT whenever SelectionText is set.
+                if (kind != COREWEBVIEW2_CONTEXT_MENU_TARGET_KIND_SELECTED_TEXT) {
+                  wil::unique_cotaskmem_string selText;
+                  if (SUCCEEDED(target->get_SelectionText(&selText)) && selText && selText.get()[0] != L'\0') {
+                    applicableKinds.insert(2); // SELECTED_TEXT
+                  }
                 }
 
                 // Check if it's a link
@@ -2060,6 +2106,7 @@ namespace flutter_inappwebview_plugin
                   if (SUCCEEDED(target->get_LinkUri(&linkUri)) && linkUri) {
                     hitType = 7; // SRC_ANCHOR_TYPE
                     extra = wide_to_utf8(linkUri.get());
+                    applicableKinds.insert(5); // LINK
                     // If it's also an image, set SRC_IMAGE_ANCHOR_TYPE
                     if (kind == COREWEBVIEW2_CONTEXT_MENU_TARGET_KIND_IMAGE) {
                       hitType = 8; // SRC_IMAGE_ANCHOR_TYPE
@@ -2071,6 +2118,7 @@ namespace flutter_inappwebview_plugin
                 BOOL isEditable = FALSE;
                 if (SUCCEEDED(target->get_IsEditable(&isEditable)) && isEditable) {
                   hitType = 9; // EDIT_TEXT_TYPE
+                  applicableKinds.insert(6); // EDITABLE
                 }
               }
             }
@@ -2098,8 +2146,22 @@ namespace flutter_inappwebview_plugin
               return S_OK;
             }
 
-            // Add custom menu items
+            // Add custom menu items, filtering out any whose declared
+            // targetKinds don't intersect with the current right-click target.
+            // An empty targetKinds set means "always show" (legacy default).
             for (const auto& menuItemInfo : contextMenuItems_) {
+              if (!menuItemInfo.targetKinds.empty()) {
+                bool matches = false;
+                for (auto k : menuItemInfo.targetKinds) {
+                  if (applicableKinds.count(k) > 0) {
+                    matches = true;
+                    break;
+                  }
+                }
+                if (!matches) {
+                  continue;
+                }
+              }
               wil::com_ptr<ICoreWebView2ContextMenuItem> customItem;
               auto wideTitle = utf8_to_wide(menuItemInfo.title);
               if (SUCCEEDED(webViewEnv9->CreateContextMenuItem(
