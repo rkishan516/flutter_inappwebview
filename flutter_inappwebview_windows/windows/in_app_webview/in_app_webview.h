@@ -2,6 +2,7 @@
 #define FLUTTER_INAPPWEBVIEW_PLUGIN_IN_APP_WEBVIEW_H_
 
 #include <functional>
+#include <set>
 #include <WebView2.h>
 #include <wil/com.h>
 #include <windows.ui.composition.desktop.h>
@@ -278,6 +279,11 @@ namespace flutter_inappwebview_plugin
     struct ContextMenuItemInfo {
       int64_t id;
       std::string title;
+      // Empty set means "always show"; otherwise the item is only inserted
+      // into the menu when the current right-click target kind (computed from
+      // the WebView2 ContextMenuTarget) is in this set. Values match the
+      // Dart-side ContextMenuItemTargetKind enum.
+      std::set<int64_t> targetKinds;
     };
     std::vector<ContextMenuItemInfo> contextMenuItems_;
     bool hideDefaultSystemContextMenuItems_ = false;
