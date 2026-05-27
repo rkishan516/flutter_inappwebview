@@ -1,6 +1,7 @@
 import 'package:flutter_inappwebview_internal_annotations/flutter_inappwebview_internal_annotations.dart';
 
 import 'context_menu.dart';
+import 'context_menu_item_target_kind.dart';
 import '../util.dart';
 import '../types/enum_method.dart';
 
@@ -28,6 +29,13 @@ class ContextMenuItem_ {
   ///Menu item action that will be called when an user clicks on it.
   Function()? action;
 
+  ///If non-null and non-empty, the menu item is only shown when the
+  ///right-click target matches one of these kinds. If `null` or empty, the
+  ///item is always shown (current default).
+  ///
+  ///**NOTE**: only honored on the Windows platform at the moment.
+  Set<ContextMenuItemTargetKind_>? targetKinds;
+
   @ExchangeableObjectConstructor()
   ContextMenuItem_({
     this.id,
@@ -35,6 +43,7 @@ class ContextMenuItem_ {
     @Deprecated("Use id instead") this.iosId,
     required this.title,
     this.action,
+    this.targetKinds,
   }) {
     if (Util.isAndroid) {
       // ignore: deprecated_member_use_from_same_package
@@ -50,6 +59,12 @@ class ContextMenuItem_ {
   @ExchangeableObjectMethod(toMapMergeWith: true)
   // ignore: unused_element
   Map<String, dynamic> _toMapMergeWith({EnumMethod? enumMethod}) {
-    return {"androidId": androidId, "iosId": iosId};
+    return {
+      "androidId": androidId,
+      "iosId": iosId,
+      "targetKinds": targetKinds
+          ?.map((k) => (k as ContextMenuItemTargetKind).toValue())
+          .toList(),
+    };
   }
 }

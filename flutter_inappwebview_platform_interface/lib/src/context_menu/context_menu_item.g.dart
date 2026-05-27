@@ -24,6 +24,13 @@ class ContextMenuItem {
   @Deprecated('Use id instead')
   String? iosId;
 
+  ///If non-null and non-empty, the menu item is only shown when the
+  ///right-click target matches one of these kinds. If `null` or empty, the
+  ///item is always shown (current default).
+  ///
+  ///**NOTE**: only honored on the Windows platform at the moment.
+  Set<ContextMenuItemTargetKind>? targetKinds;
+
   ///Menu item title.
   String title;
   ContextMenuItem({
@@ -32,6 +39,7 @@ class ContextMenuItem {
     @Deprecated("Use id instead") this.iosId,
     required this.title,
     this.action,
+    this.targetKinds,
   }) {
     if (Util.isAndroid) {
       this.id = this.id ?? this.androidId;
@@ -55,13 +63,26 @@ class ContextMenuItem {
       id: map['id'],
       iosId: map['id'],
       title: map['title'],
+      targetKinds: map['targetKinds'] != null
+          ? Set<ContextMenuItemTargetKind>.from(
+              (map['targetKinds'] as List).map(
+                (e) => ContextMenuItemTargetKind.fromValue(e)!,
+              ),
+            )
+          : null,
     );
     return instance;
   }
 
   @ExchangeableObjectMethod(toMapMergeWith: true)
   Map<String, dynamic> _toMapMergeWith({EnumMethod? enumMethod}) {
-    return {"androidId": androidId, "iosId": iosId};
+    return {
+      "androidId": androidId,
+      "iosId": iosId,
+      "targetKinds": targetKinds
+          ?.map((k) => (k as ContextMenuItemTargetKind).toValue())
+          .toList(),
+    };
   }
 
   ///Converts instance to a map.
