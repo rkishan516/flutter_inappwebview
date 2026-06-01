@@ -46,6 +46,11 @@ namespace flutter_inappwebview_plugin
           result_->Success(make_fl_value(functional_map(processInfos, [](const std::shared_ptr<BrowserProcessInfo>& info) { return info->toEncodableMap(); })));
         });
     }
+    else if (string_equals(methodName, "setProcessInfosChangedEnabled")) {
+      auto enabled = get_fl_map_value<bool>(arguments, "enabled");
+      webViewEnvironment->setProcessInfosChangedEnabled(enabled);
+      result->Success();
+    }
     else if (string_equals(methodName, "getFailureReportFolderPath")) {
       result->Success(make_fl_value(webViewEnvironment->getFailureReportFolderPath()));
     }

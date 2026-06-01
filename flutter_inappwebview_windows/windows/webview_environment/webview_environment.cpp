@@ -118,38 +118,7 @@ namespace flutter_inappwebview_plugin
               failedLog(add_BrowserProcessExited_HResult);
             }
 
-            if (auto environment8 = environment_.try_query<ICoreWebView2Environment8>()) {
-              auto add_ProcessInfosChanged_HResult = environment8->add_ProcessInfosChanged(Callback<ICoreWebView2ProcessInfosChangedEventHandler>(
-                [this, environment8](ICoreWebView2Environment* sender, IUnknown* args)
-                {
-                  if (!environment_) {
-                    return S_OK;
-                  }
-                  if (auto environment13 = environment_.try_query<ICoreWebView2Environment13>()) {
-                    auto hr = environment13->GetProcessExtendedInfos(Callback<ICoreWebView2GetProcessExtendedInfosCompletedHandler>(
-                      [this](HRESULT error, wil::com_ptr<ICoreWebView2ProcessExtendedInfoCollection> processCollection) -> HRESULT
-                      {
-                        if (succeededOrLog(error) && processCollection) {
-                          auto browserProcessInfosChangedDetail = BrowserProcessInfosChangedDetail::fromICoreWebView2ProcessExtendedInfoCollection(processCollection);
-                          channelDelegate->onProcessInfosChanged(std::move(browserProcessInfosChangedDetail));
-                        }
-                        return S_OK;
-                      }).Get());
-
-                    if (succeededOrLog(hr)) {
-                      return S_OK;
-                    }
-                  }
-                  wil::com_ptr<ICoreWebView2ProcessInfoCollection> processCollection;
-                  if (channelDelegate && succeededOrLog(environment8->GetProcessInfos(&processCollection))) {
-                    auto browserProcessInfosChangedDetail = BrowserProcessInfosChangedDetail::fromICoreWebView2ProcessInfoCollection(processCollection);
-                    channelDelegate->onProcessInfosChanged(std::move(browserProcessInfosChangedDetail));
-                  }
-                  return S_OK;
-                }
-              ).Get(), &processInfosChangedToken_);
-              failedLog(add_ProcessInfosChanged_HResult);
-            }
+            updateProcessInfosChangedSubscription();
 
             completionHandler(S_OK);
           }
@@ -284,6 +253,66 @@ namespace flutter_inappwebview_plugin
     }
   }
 
+  void WebViewEnvironment::setProcessInfosChangedEnabled(bool enabled)
+  {
+    processInfosChangedEnabled_ = enabled;
+    updateProcessInfosChangedSubscription();
+  }
+
+  void WebViewEnvironment::updateProcessInfosChangedSubscription()
+  {
+    auto environment8 = environment_.try_query<ICoreWebView2Environment8>();
+    if (!environment8) {
+      return;
+    }
+
+    if (!processInfosChangedEnabled_) {
+      if (processInfosChangedSubscribed_) {
+        environment8->remove_ProcessInfosChanged(processInfosChangedToken_);
+        processInfosChangedToken_ = { 0 };
+        processInfosChangedSubscribed_ = false;
+      }
+      return;
+    }
+
+    if (processInfosChangedSubscribed_) {
+      return;
+    }
+
+    auto add_ProcessInfosChanged_HResult = environment8->add_ProcessInfosChanged(Callback<ICoreWebView2ProcessInfosChangedEventHandler>(
+      [this, environment8](ICoreWebView2Environment* sender, IUnknown* args)
+      {
+        if (!environment_ || !channelDelegate || !processInfosChangedEnabled_) {
+          return S_OK;
+        }
+        if (auto environment13 = environment_.try_query<ICoreWebView2Environment13>()) {
+          auto hr = environment13->GetProcessExtendedInfos(Callback<ICoreWebView2GetProcessExtendedInfosCompletedHandler>(
+            [this](HRESULT error, wil::com_ptr<ICoreWebView2ProcessExtendedInfoCollection> processCollection) -> HRESULT
+            {
+              if (channelDelegate && processInfosChangedEnabled_ && succeededOrLog(error) && processCollection) {
+                auto browserProcessInfosChangedDetail = BrowserProcessInfosChangedDetail::fromICoreWebView2ProcessExtendedInfoCollection(processCollection);
+                channelDelegate->onProcessInfosChanged(std::move(browserProcessInfosChangedDetail));
+              }
+              return S_OK;
+            }).Get());
+
+          if (succeededOrLog(hr)) {
+            return S_OK;
+          }
+        }
+        wil::com_ptr<ICoreWebView2ProcessInfoCollection> processCollection;
+        if (succeededOrLog(environment8->GetProcessInfos(&processCollection))) {
+          auto browserProcessInfosChangedDetail = BrowserProcessInfosChangedDetail::fromICoreWebView2ProcessInfoCollection(processCollection);
+          channelDelegate->onProcessInfosChanged(std::move(browserProcessInfosChangedDetail));
+        }
+        return S_OK;
+      }
+    ).Get(), &processInfosChangedToken_);
+    if (succeededOrLog(add_ProcessInfosChanged_HResult)) {
+      processInfosChangedSubscribed_ = true;
+    }
+  }
+
   std::optional<std::string> WebViewEnvironment::getFailureReportFolderPath() const
   {
     if (!environment_) {
@@ -309,7 +338,9 @@ namespace flutter_inappwebview_plugin
         environment5->remove_BrowserProcessExited(browserProcessExitedToken_);
       }
       if (auto environment8 = environment_.try_query<ICoreWebView2Environment8>()) {
-        environment8->remove_ProcessInfosChanged(processInfosChangedToken_);
+        if (processInfosChangedSubscribed_) {
+          environment8->remove_ProcessInfosChanged(processInfosChangedToken_);
+        }
       }
     }
     environment_ = nullptr;

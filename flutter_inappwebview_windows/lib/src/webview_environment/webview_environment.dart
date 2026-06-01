@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_inappwebview_platform_interface/flutter_inappwebview_platform_interface.dart';
@@ -34,6 +36,8 @@ class WindowsWebViewEnvironment extends PlatformWebViewEnvironment
 
   @override
   final String id = IdGenerator.generate();
+  void Function(BrowserProcessInfosChangedDetail detail)?
+  _onProcessInfosChanged;
 
   WindowsWebViewEnvironment(PlatformWebViewEnvironmentCreationParams params)
     : super.implementation(
@@ -81,16 +85,33 @@ class WindowsWebViewEnvironment extends PlatformWebViewEnvironment
         }
         break;
       case 'onProcessInfosChanged':
-        if (onProcessInfosChanged != null) {
+        if (_onProcessInfosChanged != null) {
           Map<String, dynamic> arguments = call.arguments
               .cast<String, dynamic>();
           final detail = BrowserProcessInfosChangedDetail.fromMap(arguments)!;
-          onProcessInfosChanged?.call(detail);
+          _onProcessInfosChanged?.call(detail);
         }
       default:
         throw UnimplementedError("Unimplemented ${call.method} method");
     }
     return null;
+  }
+
+  @override
+  void Function(BrowserProcessInfosChangedDetail detail)?
+  get onProcessInfosChanged => _onProcessInfosChanged;
+
+  @override
+  set onProcessInfosChanged(
+    void Function(BrowserProcessInfosChangedDetail detail)? value,
+  ) {
+    _onProcessInfosChanged = value;
+    unawaited(
+      channel?.invokeMethod<void>('setProcessInfosChangedEnabled', {
+            'enabled': value != null,
+          }) ??
+          Future<void>.value(),
+    );
   }
 
   @override

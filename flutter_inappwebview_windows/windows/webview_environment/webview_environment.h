@@ -36,14 +36,19 @@ namespace flutter_inappwebview_plugin
     void useTempWebView(const std::function<void(wil::com_ptr<ICoreWebView2Controller>, wil::com_ptr<ICoreWebView2>)> completionHandler) const;
     bool isInterfaceSupported(const std::string& interfaceName) const;
     void getProcessInfos(const std::function<void(std::vector<std::shared_ptr<BrowserProcessInfo>>)> completionHandler) const;
+    void setProcessInfosChangedEnabled(bool enabled);
     std::optional<std::string> getFailureReportFolderPath() const;
 
   private:
     wil::com_ptr<ICoreWebView2Environment> environment_;
+    bool processInfosChangedEnabled_ = false;
+    bool processInfosChangedSubscribed_ = false;
     EventRegistrationToken processInfosChangedToken_ = { 0 };
     EventRegistrationToken browserProcessExitedToken_ = { 0 };
     EventRegistrationToken newBrowserVersionAvailableToken_ = { 0 };
     WNDCLASS windowClass_ = {};
+
+    void updateProcessInfosChangedSubscription();
   };
 }
 #endif //FLUTTER_INAPPWEBVIEW_PLUGIN_WEBVIEW_ENVIRONMENT_H_
