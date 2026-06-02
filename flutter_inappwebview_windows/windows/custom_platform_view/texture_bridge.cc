@@ -11,7 +11,10 @@
 
 namespace flutter_inappwebview_plugin
 {
-  const int kNumBuffers = 1;
+  // Windows Graphics Capture can starve with one buffer when Flutter consumes
+  // the shared texture on a different cadence. Match the Linux implementation's
+  // triple buffering to smooth scroll frame pacing.
+  const int kNumBuffers = 3;
 
   TextureBridge::TextureBridge(GraphicsContext* graphics_context,
     ABI::Windows::UI::Composition::IVisual* visual)
