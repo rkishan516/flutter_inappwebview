@@ -32,42 +32,69 @@ namespace flutter_inappwebview_plugin
     : plugin(plugin),
     ChannelDelegate(plugin->registrar->messenger(), InAppWebViewManager::METHOD_CHANNEL_NAME)
   {
-    if (!rohelper_) {
-      rohelper_ = std::make_unique<rx::RoHelper>(RO_INIT_SINGLETHREADED);
-
-      if (rohelper_->WinRtAvailable()) {
-        DispatcherQueueOptions options{ sizeof(DispatcherQueueOptions),
-                                       DQTYPE_THREAD_CURRENT, DQTAT_COM_STA };
-
-        if (FAILED(rohelper_->CreateDispatcherQueueController(
-          options, dispatcher_queue_controller_.put()))) {
-          std::cerr << "Creating DispatcherQueueController failed." << std::endl;
-          return;
-        }
-
-        if (!isGraphicsCaptureSessionSupported()) {
-          std::cerr << "Windows::Graphics::Capture::GraphicsCaptureSession is not "
-            "supported."
-            << std::endl;
-          return;
-        }
-
-        graphics_context_ = std::make_unique<GraphicsContext>(rohelper_.get());
-        compositor_ = graphics_context_->CreateCompositor();
-        if (compositor_) {
-          // fix for KernelBase.dll RaiseFailFastException
-          // when app is closing 
-          compositor_->AddRef();
-        }
-        valid_ = graphics_context_->IsValid();
-      }
-    }
+    ensureValidGraphicsContext();
 
     windowClass_.lpszClassName = CustomPlatformView::CLASS_NAME;
     windowClass_.lpfnWndProc = &WebViewWindowProc;
     windowClass_.style |= CS_NOCLOSE;
 
     RegisterClass(&windowClass_);
+  }
+
+  bool InAppWebViewManager::ensureValidGraphicsContext()
+  {
+    if (valid_) {
+      return true;
+    }
+
+    if (!rohelper_) {
+      rohelper_ = std::make_unique<rx::RoHelper>(RO_INIT_SINGLETHREADED);
+    }
+
+    if (!rohelper_->WinRtAvailable()) {
+      return false;
+    }
+
+    if (!dispatcher_queue_controller_) {
+      DispatcherQueueOptions options{ sizeof(DispatcherQueueOptions),
+                                     DQTYPE_THREAD_CURRENT, DQTAT_COM_STA };
+
+      if (FAILED(rohelper_->CreateDispatcherQueueController(
+        options, dispatcher_queue_controller_.put()))) {
+        std::cerr << "Creating DispatcherQueueController failed." << std::endl;
+        return false;
+      }
+    }
+
+    if (!isGraphicsCaptureSessionSupported()) {
+      std::cerr << "Windows::Graphics::Capture::GraphicsCaptureSession is not "
+        "supported."
+        << std::endl;
+      return false;
+    }
+
+    // Retry device creation: an earlier attempt (e.g. at plugin registration
+    // during a cold GPU start) may have failed before the D3D device was
+    // ready. graphics_context_ and valid_ are cached statically for the whole
+    // process, so without retrying here the webview can never be created for
+    // the rest of the session.
+    graphics_context_ = std::make_unique<GraphicsContext>(rohelper_.get());
+    if (!graphics_context_->IsValid()) {
+      graphics_context_ = nullptr;
+      return false;
+    }
+
+    if (!compositor_) {
+      compositor_ = graphics_context_->CreateCompositor();
+      if (compositor_) {
+        // fix for KernelBase.dll RaiseFailFastException
+        // when app is closing
+        compositor_->AddRef();
+      }
+    }
+
+    valid_ = true;
+    return true;
   }
 
   void InAppWebViewManager::HandleMethodCall(const flutter::MethodCall<flutter::EncodableValue>& method_call,
@@ -77,7 +104,7 @@ namespace flutter_inappwebview_plugin
     auto& methodName = method_call.method_name();
 
     if (string_equals(methodName, "createInAppWebView")) {
-      if (isSupported()) {
+      if (ensureValidGraphicsContext()) {
         createInAppWebView(arguments, std::move(result));
       }
       else {

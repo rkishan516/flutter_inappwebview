@@ -52,6 +52,10 @@ namespace flutter_inappwebview_plugin
     void createInAppWebView(const flutter::EncodableMap* arguments, std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result);
     void disposeKeepAlive(const std::string& keepAliveId);
   private:
+    // (Re)initializes the shared graphics context, retrying device creation
+    // when an earlier attempt failed. Returns whether it is now valid.
+    bool ensureValidGraphicsContext();
+
     inline static std::shared_ptr<rx::RoHelper> rohelper_ = nullptr;
     inline static winrt::com_ptr<ABI::Windows::System::IDispatcherQueueController>
       dispatcher_queue_controller_;
