@@ -287,9 +287,13 @@ namespace flutter_inappwebview_plugin
     };
     std::vector<ContextMenuItemInfo> contextMenuItems_;
     bool hideDefaultSystemContextMenuItems_ = false;
+    // Unlocalized WebView2 item names (e.g. "paste") that survive
+    // hideDefaultSystemContextMenuItems_. Empty removes them all.
+    std::set<std::string> keptDefaultSystemContextMenuItems_;
 
     void registerEventHandlers();
     void registerSurfaceEventHandlers();
+    bool isKeptDefaultContextMenuItem(ICoreWebView2ContextMenuItemCollection* menuItems, const UINT32& index) const;
     HRESULT onCallJsHandler(const bool& isMainFrame, ICoreWebView2WebMessageReceivedEventArgs* args);
   };
 }

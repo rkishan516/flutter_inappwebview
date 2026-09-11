@@ -11,7 +11,23 @@ class ContextMenuSettings_ {
   ///Whether all the default system context menu items should be hidden or not. The default value is `false`.
   bool hideDefaultSystemContextMenuItems;
 
-  ContextMenuSettings_({this.hideDefaultSystemContextMenuItems = false});
+  ///Names of the default system context menu items to keep even when
+  ///[hideDefaultSystemContextMenuItems] is `true`, for example
+  ///`{'cut', 'copy', 'paste', 'selectAll'}`. Lets you drop the browser chrome
+  ///items while the native editing commands stay, keeping their localized
+  ///labels, their enabled state and the platform clipboard.
+  ///
+  ///A name is the unlocalized English label of the item in lower camel case,
+  ///as reported by WebView2 — the "Save as" item is `saveAs`. Names matching
+  ///no default item are ignored.
+  ///
+  ///**NOTE**: only honored on the Windows platform at the moment.
+  Set<String>? keptDefaultSystemContextMenuItems;
+
+  ContextMenuSettings_({
+    this.hideDefaultSystemContextMenuItems = false,
+    this.keptDefaultSystemContextMenuItems,
+  });
 }
 
 ///Use [ContextMenuSettings] instead.
