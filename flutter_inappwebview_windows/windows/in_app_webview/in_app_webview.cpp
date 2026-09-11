@@ -433,10 +433,38 @@ namespace flutter_inappwebview_plugin
         if (hideIt != settingsMap.end() && std::holds_alternative<bool>(hideIt->second)) {
           hideDefaultSystemContextMenuItems_ = std::get<bool>(hideIt->second);
         }
+
+        auto keptIt = settingsMap.find(flutter::EncodableValue("keptDefaultSystemContextMenuItems"));
+        if (keptIt != settingsMap.end() && std::holds_alternative<flutter::EncodableList>(keptIt->second)) {
+          for (const auto& nameVal : std::get<flutter::EncodableList>(keptIt->second)) {
+            if (std::holds_alternative<std::string>(nameVal)) {
+              keptDefaultSystemContextMenuItems_.insert(std::get<std::string>(nameVal));
+            }
+          }
+        }
       }
     }
 
     registerEventHandlers();
+  }
+
+  bool InAppWebView::isKeptDefaultContextMenuItem(ICoreWebView2ContextMenuItemCollection* menuItems, const UINT32& index) const
+  {
+    if (keptDefaultSystemContextMenuItems_.empty()) {
+      return false;
+    }
+
+    wil::com_ptr<ICoreWebView2ContextMenuItem> item;
+    if (FAILED(menuItems->GetValueAtIndex(index, &item)) || !item) {
+      return false;
+    }
+
+    wil::unique_cotaskmem_string name;
+    if (FAILED(item->get_Name(&name)) || !name) {
+      return false;
+    }
+
+    return keptDefaultSystemContextMenuItems_.count(wide_to_utf8(name.get())) > 0;
   }
 
   void InAppWebView::registerEventHandlers()
@@ -2022,7 +2050,9 @@ namespace flutter_inappwebview_plugin
         Callback<ICoreWebView2ContextMenuRequestedEventHandler>(
           [this](ICoreWebView2* sender, ICoreWebView2ContextMenuRequestedEventArgs* args)
           {
-            if (!channelDelegate || contextMenuItems_.empty()) {
+            // Hiding the defaults is work on its own, so a menu that declares
+            // no custom items still has to be processed.
+            if (!channelDelegate || (contextMenuItems_.empty() && !hideDefaultSystemContextMenuItems_)) {
               return S_OK;
             }
 
@@ -2132,11 +2162,14 @@ namespace flutter_inappwebview_plugin
               return S_OK;
             }
 
-            // If hideDefaultSystemContextMenuItems, remove all existing items
+            // Remove the default items, except any allow-listed by name.
             if (hideDefaultSystemContextMenuItems_) {
               UINT32 count = 0;
               menuItems->get_Count(&count);
               for (UINT32 i = count; i > 0; i--) {
+                if (isKeptDefaultContextMenuItem(menuItems.get(), i - 1)) {
+                  continue;
+                }
                 menuItems->RemoveValueAtIndex(i - 1);
               }
             }
