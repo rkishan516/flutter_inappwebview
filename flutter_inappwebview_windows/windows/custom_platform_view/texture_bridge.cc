@@ -22,7 +22,10 @@ namespace flutter_inappwebview_plugin
   {
     capture_item_ =
       graphics_context_->CreateGraphicsCaptureItemFromVisual(visual);
-    assert(capture_item_);
+    if (!capture_item_) {
+      std::cerr << "Creating capture item failed." << std::endl;
+      return;
+    }
 
     capture_item_->add_Closed(
       Microsoft::WRL::Callback<ABI::Windows::Foundation::ITypedEventHandler<
@@ -62,7 +65,10 @@ namespace flutter_inappwebview_plugin
       static_cast<ABI::Windows::Graphics::DirectX::DirectXPixelFormat>(
         kPixelFormat),
       kNumBuffers, size);
-    assert(frame_pool_);
+    if (!frame_pool_) {
+      std::cerr << "Creating capture frame pool failed." << std::endl;
+      return false;
+    }
 
     frame_pool_->add_FrameArrived(
       Microsoft::WRL::Callback<ABI::Windows::Foundation::ITypedEventHandler<

@@ -26,6 +26,9 @@ namespace flutter_inappwebview_plugin
     const auto height = desc.Height;
 
     EnsureSurface(width, height);
+    if (!surface_) {
+      return;
+    }
 
     auto device_context = graphics_context_->d3d_device_context();
 
@@ -89,11 +92,12 @@ namespace flutter_inappwebview_plugin
       ProcessFrame(last_frame_);
     }
 
-    if (surface_) {
-      // Gets released in the SurfaceDescriptor's release callback.
-      surface_->AddRef();
+    if (!surface_) {
+      return nullptr;
     }
 
+    // Gets released in the SurfaceDescriptor's release callback.
+    surface_->AddRef();
     return &surface_descriptor_;
   }
 
