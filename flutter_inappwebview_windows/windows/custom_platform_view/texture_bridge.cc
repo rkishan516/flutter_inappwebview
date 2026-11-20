@@ -87,6 +87,7 @@ namespace flutter_inappwebview_plugin
     if (FAILED(frame_pool_->CreateCaptureSession(capture_item_.get(),
       capture_session_.put()))) {
       std::cerr << "Creating capture session failed." << std::endl;
+      StopInternal();
       return false;
     }
 
@@ -95,6 +96,7 @@ namespace flutter_inappwebview_plugin
       return true;
     }
 
+    StopInternal();
     return false;
   }
 
@@ -114,6 +116,13 @@ namespace flutter_inappwebview_plugin
       assert(closable);
       closable->Close();
       capture_session_ = nullptr;
+    }
+    if (frame_pool_) {
+      if (auto closable =
+        frame_pool_.try_as<ABI::Windows::Foundation::IClosable>()) {
+        closable->Close();
+      }
+      frame_pool_ = nullptr;
     }
   }
 
