@@ -56,10 +56,15 @@ namespace flutter_inappwebview_plugin
     // when an earlier attempt failed. Returns whether it is now valid.
     bool ensureValidGraphicsContext();
 
-    inline static std::shared_ptr<rx::RoHelper> rohelper_ = nullptr;
-    inline static winrt::com_ptr<ABI::Windows::System::IDispatcherQueueController>
-      dispatcher_queue_controller_;
-    inline static std::unique_ptr<GraphicsContext> graphics_context_ = nullptr;
+    // Never destroyed: releasing the D3D device or uninitializing WinRT during
+    // DLL unload at process exit crashes some GPU drivers.
+    inline static std::shared_ptr<rx::RoHelper>& rohelper_ =
+      *new std::shared_ptr<rx::RoHelper>();
+    inline static winrt::com_ptr<ABI::Windows::System::IDispatcherQueueController>&
+      dispatcher_queue_controller_ = *new winrt::com_ptr<
+      ABI::Windows::System::IDispatcherQueueController>();
+    inline static std::unique_ptr<GraphicsContext>& graphics_context_ =
+      *new std::unique_ptr<GraphicsContext>();
     inline static winrt::com_ptr<ABI::Windows::UI::Composition::ICompositor> compositor_;
     WNDCLASS windowClass_ = {};
     inline static bool valid_ = false;

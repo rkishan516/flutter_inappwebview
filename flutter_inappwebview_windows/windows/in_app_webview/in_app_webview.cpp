@@ -157,9 +157,10 @@ namespace flutter_inappwebview_plugin
           options = nullptr;
           failedLog(env->QueryInterface(IID_PPV_ARGS(&webViewEnv3)));
         }
+        HRESULT hr;
         if (willBeSurface && (webViewEnv10 || webViewEnv3)) {
           if (webViewEnv10 && options) {
-            failedLog(webViewEnv10->CreateCoreWebView2CompositionControllerWithOptions(parentWindow, options.get(), Callback<ICoreWebView2CreateCoreWebView2CompositionControllerCompletedHandler>(
+            hr = webViewEnv10->CreateCoreWebView2CompositionControllerWithOptions(parentWindow, options.get(), Callback<ICoreWebView2CreateCoreWebView2CompositionControllerCompletedHandler>(
               [completionHandler, env, parentWindow](HRESULT result, wil::com_ptr<ICoreWebView2CompositionController> compositionController) -> HRESULT
               {
                 wil::com_ptr<ICoreWebView2Controller3> webViewController = compositionController.try_query<ICoreWebView2Controller3>();
@@ -182,10 +183,10 @@ namespace flutter_inappwebview_plugin
                 completionHandler(std::move(env), std::move(webViewController), std::move(compositionController));
                 return S_OK;
               }
-            ).Get()));
+            ).Get());
           }
           else {
-            failedLog(webViewEnv3->CreateCoreWebView2CompositionController(parentWindow, Callback<ICoreWebView2CreateCoreWebView2CompositionControllerCompletedHandler>(
+            hr = webViewEnv3->CreateCoreWebView2CompositionController(parentWindow, Callback<ICoreWebView2CreateCoreWebView2CompositionControllerCompletedHandler>(
               [completionHandler, env, parentWindow](HRESULT result, wil::com_ptr<ICoreWebView2CompositionController> compositionController) -> HRESULT
               {
                 wil::com_ptr<ICoreWebView2Controller3> webViewController = compositionController.try_query<ICoreWebView2Controller3>();
@@ -205,12 +206,12 @@ namespace flutter_inappwebview_plugin
                 completionHandler(std::move(env), std::move(webViewController), std::move(compositionController));
                 return S_OK;
               }
-            ).Get()));
+            ).Get());
           }
         }
         else {
           if (webViewEnv10 && options) {
-            failedLog(webViewEnv10->CreateCoreWebView2ControllerWithOptions(parentWindow, options.get(), Callback<ICoreWebView2CreateCoreWebView2ControllerCompletedHandler>(
+            hr = webViewEnv10->CreateCoreWebView2ControllerWithOptions(parentWindow, options.get(), Callback<ICoreWebView2CreateCoreWebView2ControllerCompletedHandler>(
               [completionHandler, env](HRESULT result, wil::com_ptr<ICoreWebView2Controller> controller) -> HRESULT
               {
                 if (failedAndLog(result) || !controller) {
@@ -220,10 +221,10 @@ namespace flutter_inappwebview_plugin
 
                 completionHandler(std::move(env), std::move(controller), nullptr);
                 return S_OK;
-              }).Get()));
+              }).Get());
           }
           else {
-            failedLog(env->CreateCoreWebView2Controller(parentWindow, Callback<ICoreWebView2CreateCoreWebView2ControllerCompletedHandler>(
+            hr = env->CreateCoreWebView2Controller(parentWindow, Callback<ICoreWebView2CreateCoreWebView2ControllerCompletedHandler>(
               [completionHandler, env](HRESULT result, wil::com_ptr<ICoreWebView2Controller> controller) -> HRESULT
               {
                 if (failedAndLog(result) || !controller) {
@@ -233,8 +234,12 @@ namespace flutter_inappwebview_plugin
 
                 completionHandler(std::move(env), std::move(controller), nullptr);
                 return S_OK;
-              }).Get()));
+              }).Get());
           }
+        }
+        // WebView2 ignores this handler's return value, so report failures here.
+        if (failedAndLog(hr)) {
+          completionHandler(nullptr, nullptr, nullptr);
         }
         return S_OK;
       };
@@ -1356,7 +1361,7 @@ namespace flutter_inappwebview_plugin
                 for (uint32_t i = 0; i < authoritiesCount; i++) {
                   wil::unique_cotaskmem_string authority;
                   if (succeededOrLog(authoritiesCollection->GetValueAtIndex(i, &authority))) {
-                    allowedCertificateAuthorities.push_back(base64_decode(wide_to_utf8(authority.get())));
+                    allowedCertificateAuthorities.push_back(wide_to_utf8(authority.get()));
                   }
                 }
               }

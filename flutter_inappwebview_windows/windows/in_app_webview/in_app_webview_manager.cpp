@@ -44,7 +44,12 @@ namespace flutter_inappwebview_plugin
   bool InAppWebViewManager::ensureValidGraphicsContext()
   {
     if (valid_) {
-      return true;
+      if (SUCCEEDED(graphics_context_->d3d_device()->GetDeviceRemovedReason())) {
+        return true;
+      }
+      // Views still bound to the lost device hold raw pointers to its context.
+      (void)graphics_context_.release();
+      valid_ = false;
     }
 
     if (!rohelper_) {
