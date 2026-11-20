@@ -1356,7 +1356,7 @@ namespace flutter_inappwebview_plugin
                 for (uint32_t i = 0; i < authoritiesCount; i++) {
                   wil::unique_cotaskmem_string authority;
                   if (succeededOrLog(authoritiesCollection->GetValueAtIndex(i, &authority))) {
-                    allowedCertificateAuthorities.push_back(base64_decode(wide_to_utf8(authority.get())));
+                    allowedCertificateAuthorities.push_back(wide_to_utf8(authority.get()));
                   }
                 }
               }
